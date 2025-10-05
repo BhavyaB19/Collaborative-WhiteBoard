@@ -1,0 +1,211 @@
+import React, { useContext, useEffect, useState } from 'react';
+import Header from '../components/Header';
+import WelcomeSection from '../components/WelcomeSection';
+import StatsCard from '../components/StatsCard';
+import ActionBar from '../components/ActionBar';
+import BoardsSection from '../components/BoardsSection';
+import CreateBoardModal from '../components/CreateBoardModal';
+import axios from 'axios';
+import { toast } from 'react-toastify';
+import { UserContext } from '../context/UserContext.jsx';
+import { useNavigate } from 'react-router-dom'; 
+import axiosInstance from '../helper.js';
+
+const Dashboard = () => {
+
+  const navigate = useNavigate()
+  const {backendUrl, userId, setUserId} = useContext(UserContext)
+
+  const [boards, setBoards] = useState([
+    {
+      id: 1,
+      title: 'Project Planning',
+      content: 'Main project planning and roadmap',
+      updatedAt: '2024-01-15',
+    },
+    // {
+    //   id: 2,
+    //   title: 'Design Ideas',
+    //   description: 'Creative design concepts and inspiration',
+    //   color: 'bg-purple-500',
+    //   lastModified: '2024-01-14',
+    //   collaborators: 2,
+    //   isStarred: false
+    // },
+    // {
+    //   id: 3,
+    //   title: 'Team Meeting Notes',
+    //   description: 'Weekly team sync and action items',
+    //   color: 'bg-green-500',
+    //   lastModified: '2024-01-13',
+    //   collaborators: 5,
+    //   isStarred: true
+    // }
+  ]);
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newBoard, setNewBoard] = useState({
+    title: '',
+    description: ''
+  });
+
+  // const colors = [
+  //   'bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-red-500',
+  //   'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500', 'bg-orange-500'
+  // ];
+
+  const fetchAllBoards = async () => {
+    try {
+      const { data } = await axiosInstance.get('/api/boards/getboards');
+      if (data.success) {
+      setBoards(data.data);
+      } else {
+      toast.error(data.message);
+    }
+    } catch (error) {
+      toast.error("Failed to fetch boards");
+    } 
+  }
+
+  useEffect(() => {
+    fetchAllBoards();
+  }, [])
+
+  const handleCreateBoard = async (e) => {
+    e.preventDefault();
+    console.log({ title: newBoard.title, content: newBoard.description, authorId: userId });
+    try {
+      const response = await axios.post(backendUrl+'/api/boards/create', {
+        title: newBoard.title,
+        content: newBoard.description,
+        authorId: userId // Replace with actual user ID
+      })
+      if (response.data.success) {
+        const board = response.data.data;
+        setBoards([board, ...boards]);
+      } else {
+        toast.error("yoyo")
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  }
+
+  // const handleCreateBoard = (e) => {
+  //   e.preventDefault();
+  //   if (newBoard.title.trim()) {
+  //     const board = {
+  //       id: Date.now(),
+  //       title: newBoard.title,
+  //       description: newBoard.description,
+  //       color: newBoard.color,
+  //       lastModified: new Date().toISOString().split('T')[0],
+  //       collaborators: 1,
+  //       isStarred: false
+  //     };
+  //     setBoards([board, ...boards]);
+  //     setNewBoard({ title: '', description: '', color: 'bg-blue-500' });
+  //     setShowCreateModal(false);
+  //   }
+  // };
+
+  const toggleStar = (id) => {
+    setBoards(boards.map(board => 
+      board.id === id ? { ...board, isStarred: !board.isStarred } : board
+    ));
+  };
+
+  const deleteBoard = (id) => {
+    setBoards(boards.filter(board => board.id !== id));
+  };
+
+  const starredBoards = boards.filter(board => board.isStarred);
+
+  const statsData = [
+    {
+      icon: (
+        <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      title: 'Total Boards',
+      value: boards.length,
+      color: 'bg-blue-500/20'
+    },
+    {
+      icon: (
+        <svg className="w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+        </svg>
+      ),
+      title: 'Starred',
+      value: starredBoards.length,
+      color: 'bg-yellow-500/20'
+    },
+    {
+      icon: (
+        <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      ),
+      title: 'Collaborators',
+      value: boards.reduce((acc, board) => acc + board.collaborators, 0),
+      color: 'bg-green-500/20'
+    },
+    {
+      icon: (
+        <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      title: 'Recent Activity',
+      value: 12,
+      color: 'bg-purple-500/20'
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <Header />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <WelcomeSection />
+
+        {/* Quick Stats */}
+        {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {statsData.map((stat, index) => (
+            <StatsCard key={index} {...stat} />
+          ))}
+        </div> */} 
+
+        <ActionBar onCreateClick={() => setShowCreateModal(true)} />
+
+        {/* <BoardsSection 
+          title="Starred Boards"
+          boards={starredBoards}
+          onToggleStar={toggleStar}
+          onDelete={deleteBoard}
+          showStarIcon={true}
+        /> */}
+
+        <BoardsSection 
+          // title="All Boards"
+          boards={boards}
+          onToggleStar={toggleStar}
+          onDelete={deleteBoard}
+        />
+
+        <CreateBoardModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleCreateBoard}
+          newBoard={newBoard}
+          setNewBoard={setNewBoard}
+          // colors={colors}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
