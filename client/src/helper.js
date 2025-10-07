@@ -1,8 +1,6 @@
 import axios from "axios";
-import { useContext } from "react";
-import { UserContext } from "./context/UserContext";
 
-const backendUrl = useContext(UserContext)
+const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 const axiosInstance = axios.create({
     baseURL: backendUrl,

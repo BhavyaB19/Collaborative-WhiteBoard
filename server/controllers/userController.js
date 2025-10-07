@@ -66,5 +66,23 @@ export const logout = (req, res) => {
 }
 
 export const getUserDetails = async (req, res) => {
-    
+    try {
+        const {userId} = req.body;
+        const existingUser = await prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!existingUser) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: { isAuthenticated: true },
+            select: { id: true, name: true, email: true, isAuthenticated: true },
+        });
+        return res.json({ success: true, data: updatedUser });
+
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
 }

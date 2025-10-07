@@ -4,8 +4,8 @@ import { protectedRoute } from '../middlewares/tokenVerify.js';
 
 const boardRouter = express.Router();
 
-boardRouter.post('/create', createWhiteboard)
-boardRouter.get('/getboards', getAllBoards)
+boardRouter.post('/create',protectedRoute, createWhiteboard)
+boardRouter.get('/getboards', protectedRoute, getAllBoards)
 boardRouter.get('/getboards/:boardId', protectedRoute, getBoardById)
 boardRouter.put('/update/:boardId', protectedRoute, updateWhiteboard)
 boardRouter.delete('/delete/:boardId', protectedRoute, deleteWhiteboard)
