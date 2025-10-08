@@ -1,5 +1,6 @@
 import { createContext, useState } from "react";
 import axios from "axios";
+import { toast } from "react-toastify";
 
 export const UserContext = createContext()
 
@@ -8,9 +9,23 @@ export const UserContextProvider = (props) => {
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL
     const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [ userId, setUserId ] = useState(null);
+    const [ userData, setUserData ] = useState(null);
 
-    const value = {backendUrl, isLoggedIn, setIsLoggedIn, userId, setUserId};
+    const getUserData = async () => {
+        try {
+            const {data} = await axios.get(backendUrl + '/api/users/getuserdata');
+            if (data?.success) {
+                console.log('User details:', data.data);
+                setUserData(data.data);
+            } else {
+                toast.error(data.message);
+            }
+        } catch (error) {
+            toast.error("Session expired. Please login again.")
+        }
+    }
+
+    const value = {backendUrl, isLoggedIn, setIsLoggedIn, userData, setUserData, getUserData};
 
     return (
         <UserContext.Provider value={value}>

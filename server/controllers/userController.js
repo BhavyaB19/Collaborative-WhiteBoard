@@ -2,6 +2,14 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../db.js';
 
+const isProd = process.env.NODE_ENV === 'production';
+const cookieOptions = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? 'None' : 'Lax',
+  path: '/',
+};
+
 export const signup = async (req, res) => {
     const { name, email, password } = req.body;
         if (!name || !email || !password) {
@@ -24,7 +32,7 @@ export const signup = async (req, res) => {
         });
         
         const token = jwt.sign({ userId: newUser.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.cookie('token', token, { httpOnly: true });
+        res.cookie('token', token, cookieOptions);
         return res.status(201).json({ success: true, message: 'User created successfully.', token });
         
     } catch (error) {
@@ -49,7 +57,7 @@ export const login = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid password.' });
         }
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.cookie('token', token, { httpOnly: true });
+        res.cookie('token', token, cookieOptions);
         return res.json({ success: true, message: 'Login successful.', token });
     } catch (error) {
         return res.json({ success: false, message: error.message });
@@ -58,7 +66,7 @@ export const login = async (req, res) => {
 
 export const logout = (req, res) => {
     try {
-        res.clearCookie('token', { httpOnly: true });
+        res.clearCookie('token', { httpOnly: true, secure: true, sameSite: 'None', path: '/' });
         return res.json({ success: true, message: 'Logout successful.' });
     } catch (error) {
         return res.json({ success: false, message: error.message });
@@ -67,16 +75,16 @@ export const logout = (req, res) => {
 
 export const getUserDetails = async (req, res) => {
     try {
-        const {userId} = req.body;
+        const {email} = req.body;
         const existingUser = await prisma.user.findUnique({
-            where: { id: userId },
+            where: { email: email },
         });
         if (!existingUser) {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
+        const updatedUser = await prisma.user.update({  
+            where: { email: email },
             data: { isAuthenticated: true },
             select: { id: true, name: true, email: true, isAuthenticated: true },
         });

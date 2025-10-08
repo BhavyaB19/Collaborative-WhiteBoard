@@ -8,7 +8,7 @@ const Login = () => {
 
   const navigate = useNavigate()
 
-  const {backendUrl, userId, setUserId} = useContext(UserContext)
+  const {backendUrl, userData, setUserData, getUserData} = useContext(UserContext)
   
 
   const [isLogin, setIsLogin] = useState(true);
@@ -51,7 +51,7 @@ const Login = () => {
         const {data} = await axios.post( backendUrl+ '/api/users/signup', {name, email, password})
         if (data?.success) {
           setIsLogin(true)
-          setUserId(data?.userId);
+          getUserData()
           toast.success("Account created successfully")
           setTimeout(() => navigate('/dashboard'), 2000)
         } else{
@@ -61,7 +61,7 @@ const Login = () => {
         const {data} = await axios.post(backendUrl + '/api/users/login', {email, password})
         if (data?.success) {
           setIsLogin(true)
-          setUserId(data?.userId);
+          getUserData()
           toast.success(data?.message)
           navigate('/dashboard')
         } else {

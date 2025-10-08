@@ -14,7 +14,7 @@ import axiosInstance from '../helper.js';
 const Dashboard = () => {
 
   const navigate = useNavigate()
-  const {backendUrl, userId, setUserId} = useContext(UserContext)
+  const {backendUrl, userData, setUserData, getUserData} = useContext(UserContext)
 
   const [boards, setBoards] = useState([
     {
@@ -164,6 +164,21 @@ const Dashboard = () => {
     }
   ];
 
+  const logout = async () => {
+    try {
+      const {data} = await axiosInstance.post('/api/users/logout')
+      if (data?.success) {
+        setUserData(null)
+        toast.success("Logged out successfully")
+        navigate('/login')
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error("Logout failed")
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <Header />
@@ -203,7 +218,16 @@ const Dashboard = () => {
           setNewBoard={setNewBoard}
           // colors={colors}
         />
+
+        <div className='flex justify-center'>
+          <button className='mt-10 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition'
+          onClick={logout}>
+            Logout 
+          </button>  
+        </div>  
+
       </div>
+      
     </div>
   );
 };
