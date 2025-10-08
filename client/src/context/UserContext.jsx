@@ -1,6 +1,7 @@
 import { createContext, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import axiosInstance from "../helper";
 
 export const UserContext = createContext()
 
@@ -13,7 +14,7 @@ export const UserContextProvider = (props) => {
 
     const getUserData = async () => {
         try {
-            const {data} = await axios.get(backendUrl + '/api/users/getuserdata');
+            const {data} = await axiosInstance.get('/api/users/getuserdata');
             if (data?.success) {
                 console.log('User details:', data.data);
                 setUserData(data.data);

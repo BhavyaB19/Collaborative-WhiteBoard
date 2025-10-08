@@ -75,21 +75,21 @@ export const logout = (req, res) => {
 
 export const getUserDetails = async (req, res) => {
     try {
-        const {email} = req.body;
-        const existingUser = await prisma.user.findUnique({
-            where: { email: email },
-        });
-        if (!existingUser) {
-            return res.status(404).json({ success: false, message: 'User not found.' });
+        const user = req.user; // set by protectedRoute
+        if (!user) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
 
-        const updatedUser = await prisma.user.update({  
-            where: { email: email },
-            data: { isAuthenticated: true },
+        // Optionally re-fetch to select explicit fields
+        const dbUser = await prisma.user.findUnique({
+            where: { id: user.id },
             select: { id: true, name: true, email: true, isAuthenticated: true },
         });
-        return res.json({ success: true, data: updatedUser });
 
+        if (!dbUser) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+        return res.json({ success: true, data: dbUser });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
