@@ -83,7 +83,7 @@ export const getUserDetails = async (req, res) => {
         // Optionally re-fetch to select explicit fields
         const dbUser = await prisma.user.findUnique({
             where: { id: user.id },
-            select: { id: true, name: true, email: true, isAuthenticated: true },
+            select: { id: true, name: true, email: true, isAuthenticated: true }, //check isauthenticated in db if it updates or not
         });
 
         if (!dbUser) {

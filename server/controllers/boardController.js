@@ -4,6 +4,7 @@ import prisma from '../db.js'
 export const getAllBoards = async (req, res) => {
     try {
         const boards = await prisma.board.findMany({
+            where: { authorId: req.user.id },
             orderBy: { updatedAt: 'desc' }
         });
         res.json({success: true, data: boards});
@@ -26,13 +27,13 @@ export const getBoardById = async (req, res) => {
 }
 
 export const createWhiteboard = async (req, res) => {
-    const { title, content, authorId } = req.body;
+    const { title, content } = req.body;
     try {
-        if (!title || !content || !authorId) {
+        if (!title || !content) {
           return res.status(400).json({ error: "Missing required fields" });
         }
         const board = await prisma.board.create({
-            data: { title, content, authorId }
+            data: { title, content, authorId: req.user.id }
         })
         res.json({success: true, data: board})
     } catch (error) {
