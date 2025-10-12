@@ -14,7 +14,7 @@ const Board = () => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
-  const [tool, setTool] = useState('circle');  
+  const [tool, setTool] = useState('pen');  
   const [mode, setMode] = useState("draw");
   const [history, setHistory] = useState([]);
   const [index, setIndex] = useState(-1);
@@ -39,13 +39,16 @@ const Board = () => {
   }
 
   const undo = () => {
-    console.log(index);
     if (index <= 0) return;
     setIndex(index - 1);
     restoreFromHistory(history[index - 1]);
   }
 
-  const redo = () => {}
+  const redo = () => {
+    if (index > history.length - 1) return;
+    setIndex(index + 1);
+    restoreFromHistory(history[index + 1]);
+  }
 
   const clearCanvas = () => {
     const canvas = document.querySelector('canvas');

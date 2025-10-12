@@ -101,7 +101,7 @@ const Canvas = ({canvasRef, containerRef, tool, mode, handleHistory}) => {
             ctx.stroke()
         }
         ctx.closePath()
-        handleHistory();
+        pushHistory();
     }
 
   return (
