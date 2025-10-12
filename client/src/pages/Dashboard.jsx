@@ -17,12 +17,12 @@ const Dashboard = () => {
   const {backendUrl, userData, setUserData, getUserData} = useContext(UserContext)
 
   const [boards, setBoards] = useState([
-    {
-      id: 1,
-      title: 'Project Planning',
-      content: 'Main project planning and roadmap',
-      updatedAt: '2024-01-15',
-    },
+    // {
+    //   id: 1,
+    //   title: 'Project Planning',
+    //   content: 'Main project planning and roadmap',
+    //   updatedAt: '2024-01-15',
+    // },
     // {
     //   id: 2,
     //   title: 'Design Ideas',
@@ -73,16 +73,16 @@ const Dashboard = () => {
 
   const handleCreateBoard = async (e) => {
     e.preventDefault();
-    console.log({ title: newBoard.title, content: newBoard.description, authorId: userId });
     try {
       const response = await axios.post(backendUrl+'/api/boards/create', {
         title: newBoard.title,
-        content: newBoard.description,
-        authorId: userId // Replace with actual user ID
+        content: newBoard.description
       })
       if (response.data.success) {
         const board = response.data.data;
         setBoards([board, ...boards]);
+        setShowCreateModal(false);
+        setNewBoard({ title: '', description: '' });
       } else {
         toast.error("yoyo")
       }
@@ -115,8 +115,18 @@ const Dashboard = () => {
     ));
   };
 
-  const deleteBoard = (id) => {
-    setBoards(boards.filter(board => board.id !== id));
+  const deleteBoard = async (id) => {
+    try {
+      const {data} = await axiosInstance.delete(`/api/boards/delete/${id}`);
+      if (data?.success) {
+        setBoards(boards.filter(board => board.id !== id));
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error("Failed to delete board");
+    }
+    //setBoards(boards.filter(board => board.id !== id));
   };
 
   const starredBoards = boards.filter(board => board.isStarred);
@@ -191,7 +201,7 @@ const Dashboard = () => {
           {statsData.map((stat, index) => (
             <StatsCard key={index} {...stat} />
           ))}
-        </div> */} 
+        </div>  */}
 
         <ActionBar onCreateClick={() => setShowCreateModal(true)} />
 

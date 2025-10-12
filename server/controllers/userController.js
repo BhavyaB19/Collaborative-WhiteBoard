@@ -7,7 +7,7 @@ const cookieOptions = {
   httpOnly: true,
   secure: isProd,
   sameSite: isProd ? 'None' : 'Lax',
-  path: '/',
+  path: '/'
 };
 
 export const signup = async (req, res) => {

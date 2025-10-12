@@ -1,8 +1,18 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const BoardCard = ({ board, onToggleStar, onDelete }) => {
+
+  const navigate = useNavigate();
+
+  const takeToBoard = () => {
+    navigate(`/board/${board.id}`);
+  }
+  
   return (
-    <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 hover:border-gray-600 transition-all duration-300 group">
+    <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 hover:border-gray-600 transition-all duration-300 group cursor-pointer"
+    onClick={takeToBoard}
+    >
       <div className="flex justify-between items-start mb-4">
         <div className={`w-12 h-12 bg-indigo-700 rounded-lg flex items-center justify-center`}>
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -11,7 +21,11 @@ const BoardCard = ({ board, onToggleStar, onDelete }) => {
         </div>
         <div className="flex space-x-2">
           <button
-            onClick={() => onToggleStar(board.id)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleStar(board.id)
+             }
+            }
             className={`p-2 rounded-lg transition-colors ${
               board.isStarred 
                 ? 'text-yellow-400 hover:bg-yellow-400/20' 
@@ -23,7 +37,11 @@ const BoardCard = ({ board, onToggleStar, onDelete }) => {
             </svg>
           </button>
           <button
-            onClick={() => onDelete(board.id)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(board.id)
+             }
+            }
             className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/20 rounded-lg transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
