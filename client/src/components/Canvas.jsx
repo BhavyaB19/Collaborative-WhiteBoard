@@ -8,24 +8,23 @@ const Canvas = ({canvasRef, containerRef, tool, mode, handleHistory}) => {
 
     useEffect(() => {
         const canvas = canvasRef.current;
-        const container = containerRef.current;
-        if (!canvas || !container) return;
+        if (!canvas) return;
 
         function resize() {
-        const dpr = window.devicePixelRatio || 1;
-        const rect = container.getBoundingClientRect();
-        canvas.width = Math.floor(rect.width * dpr);
-        canvas.height = Math.floor(rect.height * dpr);
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
-        const ctx = canvas.getContext("2d");
-        ctx.scale(dpr, dpr);
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = Math.floor(rect.width * dpr);
+            canvas.height = Math.floor(rect.height * dpr);
+            canvas.style.width = `${rect.width}px`;
+            canvas.style.height = `${rect.height}px`;
+            const ctx = canvas.getContext("2d");
+            ctx.scale(dpr, dpr);
         }
 
 
         resize();
         const obs = new ResizeObserver(resize);
-        obs.observe(container);
+        obs.observe(canvas);
         return () => obs.disconnect();
         }, []
     );
@@ -107,11 +106,11 @@ const Canvas = ({canvasRef, containerRef, tool, mode, handleHistory}) => {
   return (
     <>
         <canvas
-        width={window.innerWidth - 256}
-        height={window.innerHeight - 200}
+        width={window.innerWidth }
+        height={window.innerHeight - 100}
         onMouseDown={startDraw}
         onMouseMove={moveDraw}
-        onMouseUp={endDraw}
+        onMouseUp={endDraw} 
         onMouseLeave={endDraw}
         onTouchStart={startDraw}
         onTouchMove={moveDraw}

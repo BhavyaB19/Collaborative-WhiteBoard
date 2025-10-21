@@ -1,4 +1,3 @@
-import React, { use } from 'react'
 import line from '../assets/line.svg'
 import pen from '../assets/pen.svg'
 import square from '../assets/square.svg'
@@ -12,7 +11,6 @@ import Canvas from '../components/Canvas'
 const Board = () => {
 
   const canvasRef = useRef(null);
-  const containerRef = useRef(null);
 
   const [tool, setTool] = useState('pen');  
   const [mode, setMode] = useState("draw");
@@ -107,7 +105,7 @@ const Board = () => {
         </div>
       </div>
 
-      <Canvas canvasRef={canvasRef} containerRef={containerRef} tool={tool} mode={mode} handleHistory={handleHistory}/>
+      <Canvas canvasRef={canvasRef} tool={tool} mode={mode} handleHistory={handleHistory}/>
       
     </div>
   )
