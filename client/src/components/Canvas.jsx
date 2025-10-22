@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react'
 
-const Canvas = ({canvasRef, containerRef, tool, mode, handleHistory}) => {
+const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
 
     
     const [isDrawing, setIsDrawing] = useState(false);
     const [startPos, setStartPos] = useState(null);
-
+    const [currentPath, setCurrentPath] = useState([]);
+    const [eraserSize, setEraserSize] = useState(2);
+    
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -63,7 +65,15 @@ const Canvas = ({canvasRef, containerRef, tool, mode, handleHistory}) => {
             ctx.lineJoin = "round"
             ctx.strokeStyle = "white" //mode === "draw" ? "white" : "black" Check this line afterwards
             ctx.moveTo(pos.x, pos.y)
-        }  
+        }  else if (tool === "eraser") {
+            ctx.globalCompositeOperation = 'destination-out'
+            ctx.beginPath()
+            ctx.lineCap = "round"
+            ctx.lineJoin = "round"
+            ctx.lineWidth = eraserSize
+            ctx.moveTo(pos.x, pos.y)
+            setCurrentPath([pos])
+        }
     }
 
     const moveDraw = (e) => {
@@ -75,7 +85,10 @@ const Canvas = ({canvasRef, containerRef, tool, mode, handleHistory}) => {
         if (tool === 'pen') {
             ctx.lineTo(pos.x, pos.y)
             ctx.stroke()
-        } 
+        }  else if (tool === 'eraser') {
+            ctx.lineTo(pos.x, pos.y)
+            ctx.stroke()
+        }
     }
 
     const endDraw = (e) => {
@@ -83,8 +96,11 @@ const Canvas = ({canvasRef, containerRef, tool, mode, handleHistory}) => {
         setIsDrawing(false);
         const ctx = getCtx()
         if (!ctx) return;
+        if (tool === "eraser") {
+            ctx.globalCompositeOperation = 'source-over'
+        }
 
-        if(tool !== 'pen' && startPos) {
+        if(tool !== 'pen' && tool !== 'eraser' && startPos) {
             const pos = getPosFromEvents(e);
             ctx.beginPath()
             ctx.strokeStyle = "white"
