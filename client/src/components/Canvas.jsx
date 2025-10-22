@@ -7,6 +7,7 @@ const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
     const [startPos, setStartPos] = useState(null);
     const [currentPath, setCurrentPath] = useState([]);
     const [eraserSize, setEraserSize] = useState(2);
+    const [savedCanvasState, setSavedCanvasState] = useState(null);
     
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -20,7 +21,7 @@ const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
             canvas.style.width = `${rect.width}px`;
             canvas.style.height = `${rect.height}px`;
             const ctx = canvas.getContext("2d");
-            ctx.scale(dpr, dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         }
 
 
@@ -59,6 +60,14 @@ const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
         setIsDrawing(true);
         const pos = getPosFromEvents(e);
         setStartPos(pos);
+
+        // Save canvas state before starting shape
+        if (tool === 'line' || tool === 'square' || tool === 'circle') {
+            const canvas = canvasRef.current;
+            const data = canvas.toDataURL('image/png');
+            setSavedCanvasState(data);
+        }
+
         if (tool === 'pen') {
             ctx.beginPath()
             ctx.lineCap = "round"
@@ -88,6 +97,37 @@ const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
         }  else if (tool === 'eraser') {
             ctx.lineTo(pos.x, pos.y)
             ctx.stroke()
+        } else if (tool === 'line' || tool === 'square' || tool === 'circle') {
+            // Restore saved state and draw dotted preview
+            if (savedCanvasState) {
+                const canvas = canvasRef.current;
+                const dpr = window.devicePixelRatio || 1;
+                const img = new Image();
+                img.onload = () => {
+                    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+                    ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
+                    
+                    // Draw dotted preview
+                    ctx.beginPath();
+                    ctx.strokeStyle = "white";
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]); // Dotted line
+                    
+                    if (tool === 'line') {
+                        ctx.moveTo(startPos.x, startPos.y);
+                        ctx.lineTo(pos.x, pos.y);
+                    } else if (tool === 'square') {
+                        ctx.rect(startPos.x, startPos.y, pos.x - startPos.x, pos.y - startPos.y);
+                    } else if (tool === 'circle') {
+                        const radius = Math.sqrt(Math.pow(pos.x - startPos.x, 2) + Math.pow(pos.y - startPos.y, 2));
+                        ctx.arc(startPos.x, startPos.y, radius, 0, 2 * Math.PI);
+                    }
+                    
+                    ctx.stroke();
+                    ctx.setLineDash([]); // Reset to solid line
+                };
+                img.src = savedCanvasState;
+            }
         }
     }
 
@@ -116,6 +156,7 @@ const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
             ctx.stroke()
         }
         ctx.closePath()
+        setSavedCanvasState(null)
         pushHistory();
     }
 
