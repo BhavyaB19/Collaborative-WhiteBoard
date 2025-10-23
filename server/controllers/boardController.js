@@ -61,11 +61,51 @@ export const deleteWhiteboard = async (req, res) => {
         await prisma.board.delete({
             where: { id: Number(boardId) }
         })
-        // await prisma.event.deleteMany({
-        //     where: { boardId: Number(boardId) }
-        // })
         res.json({ success: true, message: "Board deleted." })
     } catch (error) {
         res.json({error: error.message})
+    }
+}
+
+export const saveDrawingEvent = async (req, res) => {
+    const {boardId} = req.params
+    const {eventType, eventData} = req.body
+    try {
+        const event = await prisma.event.create({
+            data: {
+                board_id: Number(boardId),
+                user_id: req.user.id,
+                event_type: eventType,
+                event_data: JSON.parse(eventData)
+            }
+        })
+        res.json({success:true, data: event})
+    } catch (error) {
+        res.json({success: false, error: error.message})
+    }
+}
+
+export const getBoardEvents = async (req, res) => {
+    const {boardId} = req.params
+    try {
+        const events = await prisma.event.findMany({
+            where: {board_id: Number(boardId)},
+            orderBy: {createdAt: 'asc'}
+        })
+        res.json({success: true, data: events})
+    } catch (error) {
+        res.json({success: false, error: error.message})
+    }
+}
+
+export const clearBoardEvents = async (req,res) => {
+    const { boardId } = req.params
+    try {
+        await prisma.event.deleteMany({
+            where: {board_id: Number(boardId)}
+        })
+        res.json({success: true, message: "Board events cleared"})
+    } catch (error) {
+        res.json({success: false, error: error.message})
     }
 }

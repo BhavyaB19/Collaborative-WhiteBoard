@@ -24,7 +24,8 @@ model User {
   createdAt DateTime @default(now())
   isAuthenticated Boolean @default(false)
   @@map(name: "users")
-  boards  Board[]  // <-- Add this line
+  boards  Board[]
+  events  Event[]
 }
 
 model Board {
@@ -36,14 +37,19 @@ model Board {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map(name: "boards")
+  events    Event[]
 }
 
 model Event {
+  id Int @id @default(autoincrement())
   board_id Int 
   user_id  Int 
   event_type    String
-  @@map(name: "events")
+  event_data Json 
   createdAt DateTime @default(now())
-  @@id([board_id, user_id])
+  board Board @relation(fields: [board_id], references: [id])
+  user User @relation(fields: [user_id], references: [id])
+  @@map(name: "events")
 }
 
+  
