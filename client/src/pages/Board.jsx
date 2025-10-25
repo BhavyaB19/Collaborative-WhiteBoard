@@ -6,16 +6,89 @@ import eraser from '../assets/eraser.svg'
 import menu from '../assets/menu.svg'
 import { useRef, useState, useEffect } from 'react';
 import Canvas from '../components/Canvas'
-
+import { useParams } from 'react-router-dom'
+import { boardEventService } from '../utils/boardEventService'
 
 const Board = () => {
 
   const canvasRef = useRef(null);
+  const { boardId } = useParams();
 
   const [tool, setTool] = useState('pen');  
   const [mode, setMode] = useState("draw");
   const [history, setHistory] = useState([]);
   const [index, setIndex] = useState(-1);
+  const [events, setEvents] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (boardId) {
+      loadBoardEvents()
+    }
+  }, [boardId])
+
+  const loadBoardEvents = async () => {
+    setIsLoading(true)
+    try {
+      const result = await boardEventService.getEvents(boardId)
+      if (result.success) {
+        setEvents(result.data)
+        replayEvents(result.data)
+      }
+    } catch (error) {
+      console.error("Failed to load events:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const replayEvents = async (events) => {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    events.forEach(event => {
+      const eventData = event.event_data
+      drawEvent(eventData)
+    });
+  }
+
+  const drawEvent = async (eventData) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    if (eventData.type === 'pen') {
+      ctx.beginPath()
+      ctx.moveTo(eventData.path[0].x, eventData.path[0].y)
+      eventData.path.forEach(point => {
+        ctx.lineTo(point.x, point.y)
+      });
+      ctx.stroke()
+    } else if (eventData.type === 'line') {
+      ctx.beginPath();
+      ctx.moveTo(eventData.startPos.x, eventData.startPos.y);
+      ctx.lineTo(eventData.endPos.x, eventData.endPos.y);
+      ctx.stroke();
+    } else if (eventData.type === 'square') {
+      ctx.beginPath()
+      ctx.rect(eventData.startPos.x, eventData.startPos.y, eventData.endPos.x - eventData.startPos.x, eventData.endPos.y - eventData.startPos.y)
+      ctx.stroke()
+    } else if (eventData.type === 'circle') {
+      ctx.beginPath()
+      const radius = Math.sqrt(Math.pow(eventData.endPos.x - eventData.startPos.x, 2) + Math.pow(eventData.endPos.y - eventData.startPos.y, 2))
+      ctx.arc(eventData.startPos.x, eventData.startPos.y, radius, 0, 2*Math.PI)
+      ctx.stroke()
+    }
+    
+  }
+
+  const handleEventSaved = (savedEvent) => {
+    setEvents(prev => [...prev, savedEvent])
+  }
 
   const handleHistory = (newData) => {
     let newStack = history.slice(0, index + 1);
@@ -48,12 +121,21 @@ const Board = () => {
     restoreFromHistory(history[index + 1]);
   }
 
-  const clearCanvas = () => {
+  const clearCanvas = async () => {
     const canvas = document.querySelector('canvas');
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHistory([]);
     setIndex(-1);
+
+    if (boardId) {
+      try {
+        await boardEventService.clearEvents(boardId);
+        setEvents([]);
+      } catch (error) {
+        console.error('Failed to clear events:', error);
+      }
+    }
   }
 
   return (
@@ -105,7 +187,7 @@ const Board = () => {
         </div>
       </div>
 
-      <Canvas canvasRef={canvasRef} tool={tool} mode={mode} handleHistory={handleHistory}/>
+      <Canvas canvasRef={canvasRef} tool={tool} mode={mode} handleHistory={handleHistory} boardId={boardId} onEventSaved={handleEventSaved}/>
       
     </div>
   )

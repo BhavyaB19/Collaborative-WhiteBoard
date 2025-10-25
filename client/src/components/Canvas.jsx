@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
+import { boardEventService } from '../utils/boardEventService';
 
-const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
+const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) => {
 
     
     const [isDrawing, setIsDrawing] = useState(false);
@@ -8,6 +9,7 @@ const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
     const [currentPath, setCurrentPath] = useState([]);
     const [eraserSize, setEraserSize] = useState(2);
     const [savedCanvasState, setSavedCanvasState] = useState(null);
+    const [currentEvent, setCurrentEvent] = useState(null);
     
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -53,6 +55,17 @@ const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
         return { x: clientX - rect.left, y: clientY - rect.top };
     }
 
+    const saveEventToBackend = async (eventData) => {
+        try {
+            const result = await boardEventService.saveEvent(boardId, eventData.type, eventData)
+            if (onEventSaved) {
+                onEventSaved(result.data)
+            }
+        } catch (error) {
+            console.error("Failed to save event:", error)
+        }
+    }
+
     const startDraw = (e) => {
         e.preventDefault()
         const ctx = getCtx()
@@ -61,6 +74,14 @@ const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
         const pos = getPosFromEvents(e);
         setStartPos(pos);
 
+        if (tool === 'pen' || tool === 'eraser') {
+            const eventData = {
+              type: tool,
+              startPos: pos,
+              path: [pos]
+            };
+            setCurrentEvent(eventData);
+        }
         // Save canvas state before starting shape
         if (tool === 'line' || tool === 'square' || tool === 'circle') {
             const canvas = canvasRef.current;
@@ -91,6 +112,14 @@ const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
         const ctx = getCtx()
         if (!ctx) return;
         const pos = getPosFromEvents(e);
+
+        if (currentEvent && (tool === 'pen' || tool === 'eraser')) {
+            setCurrentEvent(prev => ({
+              ...prev,
+              path: [...prev.path, pos]
+            }));
+          }
+
         if (tool === 'pen') {
             ctx.lineTo(pos.x, pos.y)
             ctx.stroke()
@@ -136,12 +165,27 @@ const Canvas = ({canvasRef, tool, mode, handleHistory}) => {
         setIsDrawing(false);
         const ctx = getCtx()
         if (!ctx) return;
+
+        // Save event to backend
+        if (currentEvent && boardId) {
+            saveEventToBackend(currentEvent);
+            setCurrentEvent(null)
+        }
         if (tool === "eraser") {
             ctx.globalCompositeOperation = 'source-over'
         }
 
         if(tool !== 'pen' && tool !== 'eraser' && startPos) {
             const pos = getPosFromEvents(e);
+            const shapeEvent = {
+                type: tool,
+                startPos,
+                endPos: pos
+              };
+              
+              if (boardId) {
+                saveEventToBackend(shapeEvent);
+              }
             ctx.beginPath()
             ctx.strokeStyle = "white"
             if (tool === 'line') {

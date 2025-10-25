@@ -1,7 +1,7 @@
 import { createContext, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import axiosInstance from "../helper";
+import axiosInstance from "../utils/helper";
 
 export const UserContext = createContext()
 

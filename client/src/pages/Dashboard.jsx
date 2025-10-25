@@ -9,7 +9,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { UserContext } from '../context/UserContext.jsx';
 import { useNavigate } from 'react-router-dom'; 
-import axiosInstance from '../helper.js';
+import axiosInstance from '../utils/helper.js';
 
 const Dashboard = () => {
 
