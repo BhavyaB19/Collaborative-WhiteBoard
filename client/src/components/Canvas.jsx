@@ -216,6 +216,7 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) =
         onTouchStart={startDraw}
         onTouchMove={moveDraw}
         onTouchEnd={endDraw}
+        
         ref={canvasRef} className='mt-10 ml-10 border-2 border-gray-600 bg-[#1E1E1E] m-10 rounded-lg cursor-crosshair'>
       
         </canvas>
