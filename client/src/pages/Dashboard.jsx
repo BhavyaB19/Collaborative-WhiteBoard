@@ -16,7 +16,7 @@ const Dashboard = () => {
   const navigate = useNavigate()
   const {backendUrl, userData, setUserData, getUserData} = useContext(UserContext)
 
-  const [boards, setBoards] = useState([ ]);
+  const [boards, setBoards] = useState([]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBoard, setNewBoard] = useState({
@@ -24,10 +24,6 @@ const Dashboard = () => {
     description: ''
   });
 
-  // const colors = [
-  //   'bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-red-500',
-  //   'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500', 'bg-orange-500'
-  // ];
 
   const fetchAllBoards = async () => {
     try {

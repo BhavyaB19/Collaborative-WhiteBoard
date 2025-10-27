@@ -1,4 +1,4 @@
-import { createContext, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import axiosInstance from "../utils/helper";
@@ -9,8 +9,8 @@ export const UserContextProvider = (props) => {
     axios.defaults.withCredentials = true;
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [ userData, setUserData ] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     const getUserData = async () => {
         try {
@@ -26,7 +26,18 @@ export const UserContextProvider = (props) => {
         }
     }
 
-    const value = {backendUrl, isLoggedIn, setIsLoggedIn, userData, setUserData, getUserData};
+    useEffect(() => {
+        const token = document.cookie.split('; ').find(row => row.startsWith('token='));
+        console.log("Token:",token)
+        if (token) {
+            
+            getUserData();
+        } else {
+            setIsLoading(false);
+        }
+    }, [])
+
+    const value = {backendUrl, userData, setUserData, getUserData};
 
     return (
         <UserContext.Provider value={value}>

@@ -31,7 +31,7 @@ export const signup = async (req, res) => {
         }
         });
         
-        const token = jwt.sign({ userId: newUser.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ userId: newUser.id }, process.env.JWT_SECRET, { expiresIn: '2d' });
         res.cookie('token', token, cookieOptions);
         return res.status(201).json({ success: true, message: 'User created successfully.', token });
         
@@ -56,7 +56,7 @@ export const login = async (req, res) => {
         if (!isPasswordValid) {
             return res.status(400).json({ success: false, message: 'Invalid password.' });
         }
-        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '2d' });
         res.cookie('token', token, cookieOptions);
         return res.json({ success: true, message: 'Login successful.', token });
     } catch (error) {

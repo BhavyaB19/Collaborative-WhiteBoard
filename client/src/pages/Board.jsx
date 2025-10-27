@@ -9,6 +9,7 @@ import { useRef, useState, useEffect } from 'react';
 import Canvas from '../components/Canvas'
 import { useParams } from 'react-router-dom'
 import { boardEventService } from '../utils/boardEventService'
+import { toast } from 'react-toastify';
 
 const Board = () => {
 
@@ -143,6 +144,17 @@ const Board = () => {
     window.location.href = '/dashboard'
   }
 
+  const copyUrlLink = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url)
+      .then(() => {
+        toast.success('Link copied to clipboard!');
+      })
+      .catch((err) => {
+        console.error('Failed to copy link: ', err);
+      });
+  }
+
   return (
     <div className='bg-[#121212] h-screen flex flex-col'>
       {/* Navbar */}
@@ -198,7 +210,7 @@ const Board = () => {
           </div>
         </div>
 
-        <button className='bg-[#215AC8] text-white text-md h-10 relative top-7 font-bold flex justify-center items-center gap-2 rounded-sm px-3 hover:bg-blue-700'>
+        <button className='bg-[#215AC8] text-white text-md h-10 relative top-7 font-bold flex justify-center items-center gap-2 rounded-sm px-3 hover:bg-blue-700' onClick={copyUrlLink}>
           Share Link
           <img src={sharelink} />
         </button>

@@ -7,10 +7,8 @@ import {useNavigate} from 'react-router-dom'
 const Login = () => {
 
   const navigate = useNavigate()
-
   const {backendUrl, userData, setUserData, getUserData} = useContext(UserContext)
   
-
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
@@ -27,21 +25,6 @@ const Login = () => {
     }));
   };
 
-  // const handleSubmit = (e) => {
-  //   e.preventDefault();
-  //   if (isLogin) {
-  //     console.log('Login attempt:', { email: formData.email, password: formData.password });
-  //     // Handle login logic here
-  //   } else {
-  //     if (formData.password !== formData.confirmPassword) {
-  //       alert('Passwords do not match');
-  //       return;
-  //     }
-  //     console.log('Signup attempt:', formData);
-  //     // Handle signup logic here
-  //   }
-  // };
-
   const handleSubmit = async (e) => {
     try {
       e.preventDefault()
@@ -51,7 +34,7 @@ const Login = () => {
         const {data} = await axios.post( backendUrl+ '/api/users/signup', {name, email, password})
         if (data?.success) {
           setIsLogin(true)
-          getUserData()
+          await getUserData()
           toast.success("Account created successfully")
           setTimeout(() => navigate('/dashboard'), 2000)
         } else{
@@ -61,7 +44,7 @@ const Login = () => {
         const {data} = await axios.post(backendUrl + '/api/users/login', {email, password})
         if (data?.success) {
           setIsLogin(true)
-          getUserData()
+          await getUserData()
           toast.success(data?.message)
           navigate('/dashboard')
         } else {
