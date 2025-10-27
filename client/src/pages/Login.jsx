@@ -3,6 +3,7 @@ import React, { useContext, useState } from 'react';
 import {toast} from 'react-toastify';
 import { UserContext } from '../context/UserContext.jsx';
 import {useNavigate} from 'react-router-dom'
+import axiosInstance from '../utils/helper.js';
 
 const Login = () => {
 
@@ -31,19 +32,20 @@ const Login = () => {
       axios.defaults.withCredentials = true;
       const {name, email, password} = formData;
       if (!isLogin) {
-        const {data} = await axios.post( backendUrl+ '/api/users/signup', {name, email, password})
+        const {data} = await axiosInstance.post('/api/users/signup', {name, email, password})
         if (data?.success) {
           setIsLogin(true)
-          await getUserData()
+          
           toast.success("Account created successfully")
-          setTimeout(() => navigate('/dashboard'), 2000)
+          
         } else{
           toast.error(data?.message)
         } 
       } else {
-        const {data} = await axios.post(backendUrl + '/api/users/login', {email, password})
+        const {data} = await axiosInstance.post('/api/users/login', {email, password})
         if (data?.success) {
           setIsLogin(true)
+          localStorage.setItem('token', data.token)
           await getUserData()
           toast.success(data?.message)
           navigate('/dashboard')

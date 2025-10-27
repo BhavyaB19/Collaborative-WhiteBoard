@@ -2,13 +2,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../db.js';
 
-const isProd = process.env.NODE_ENV === 'production';
-const cookieOptions = {
-  httpOnly: true,
-  secure: isProd,
-  sameSite: isProd ? 'None' : 'Lax',
-  path: '/'
-};
 
 export const signup = async (req, res) => {
     const { name, email, password } = req.body;
@@ -30,10 +23,7 @@ export const signup = async (req, res) => {
             name: name, email: email, password_hash: hashedPassword
         }
         });
-        
-        const token = jwt.sign({ userId: newUser.id }, process.env.JWT_SECRET, { expiresIn: '2d' });
-        res.cookie('token', token, cookieOptions);
-        return res.status(201).json({ success: true, message: 'User created successfully.', token });
+        return res.status(201).json({ success: true, message: 'User created successfully.' });
         
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
@@ -57,17 +47,8 @@ export const login = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid password.' });
         }
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '2d' });
-        res.cookie('token', token, cookieOptions);
+        
         return res.json({ success: true, message: 'Login successful.', token });
-    } catch (error) {
-        return res.json({ success: false, message: error.message });
-    }
-}
-
-export const logout = (req, res) => {
-    try {
-        res.clearCookie('token', { httpOnly: true, secure: true, sameSite: 'None', path: '/' });
-        return res.json({ success: true, message: 'Logout successful.' });
     } catch (error) {
         return res.json({ success: false, message: error.message });
     }

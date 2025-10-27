@@ -6,11 +6,11 @@ import axiosInstance from "../utils/helper";
 export const UserContext = createContext()
 
 export const UserContextProvider = (props) => {
-    axios.defaults.withCredentials = true;
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL
     const [ userData, setUserData ] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [token, setToken] = useState(localStorage.getItem('token') || null);
 
     const getUserData = async () => {
         try {
@@ -18,6 +18,7 @@ export const UserContextProvider = (props) => {
             if (data?.success) {
                 console.log('User details:', data.data);
                 setUserData(data.data);
+                setToken(localStorage.getItem('token'));
             } else {
                 toast.error(data.message);
             }
@@ -26,18 +27,7 @@ export const UserContextProvider = (props) => {
         }
     }
 
-    useEffect(() => {
-        const token = document.cookie.split('; ').find(row => row.startsWith('token='));
-        console.log("Token:",token)
-        if (token) {
-            
-            getUserData();
-        } else {
-            setIsLoading(false);
-        }
-    }, [])
-
-    const value = {backendUrl, userData, setUserData, getUserData};
+    const value = {backendUrl, userData, setUserData, getUserData, token};
 
     return (
         <UserContext.Provider value={value}>

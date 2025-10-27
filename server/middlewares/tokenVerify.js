@@ -3,7 +3,7 @@ import prisma from '../db.js';
 
 export const protectedRoute = async (req, res, next) => {
     try {
-        const token = req.cookies.token;
+        const token = req.headers.authorization;
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
         if (!user) {

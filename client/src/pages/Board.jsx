@@ -174,16 +174,16 @@ const Board = () => {
             <img src={pen} className='px-2  hover:scale-108 h-9' 
               onClick={() =>setTool('pen')}
             />
-            <img src={line} className='px-2 h-9  hover:scale-108' 
+            <img src={line} className='px-2 h-9 hover:scale-108' 
               onClick={() => setTool('line')}
             />
-            <img src={square} className='px-2 h-9  hover:scale-108'
+            <img src={square} className='px-2 h-9 hover:scale-108'
               onClick={() => setTool('square')}
             />
-            <img src={circle} className='px-2 h-9  hover:scale-108'
+            <img src={circle} className='px-2 h-9 hover:scale-108'
               onClick={() => setTool('circle')}
             />
-            <img src={eraser} className='px-2 h-9  hover:scale-108'
+            <img src={eraser} className='px-2 h-9 hover:scale-108'
               onClick={() => {
                 setTool('eraser')
                 setMode('erase')

@@ -28,6 +28,7 @@ const Dashboard = () => {
   const fetchAllBoards = async () => {
     try {
       const { data } = await axiosInstance.get('/api/boards/getboards');
+
       if (data.success) {
       setBoards(data.data);
       } else {
@@ -45,7 +46,7 @@ const Dashboard = () => {
   const handleCreateBoard = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post(backendUrl+'/api/boards/create', {
+      const response = await axiosInstance.post('/api/boards/create', {
         title: newBoard.title,
         content: newBoard.description
       })
@@ -128,18 +129,11 @@ const Dashboard = () => {
   // ];
 
   const logout = async () => {
-    try {
-      const {data} = await axiosInstance.post('/api/users/logout')
-      if (data?.success) {
-        setUserData(null)
-        toast.success("Logged out successfully")
-        navigate('/login')
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      toast.error("Logout failed")
-    }
+    localStorage.removeItem('token');
+    axios.defaults.headers.common['Authorization'] = null;
+    setUserData(null);
+    navigate('/login');
+    toast.success("Logged out successfully");
   }
 
   return (
