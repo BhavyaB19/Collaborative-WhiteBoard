@@ -2,11 +2,12 @@ import axios from 'axios';
 import React, { useContext, useState } from 'react';
 import {toast} from 'react-toastify';
 import { UserContext } from '../context/UserContext.jsx';
-import {useNavigate} from 'react-router-dom'
+import {useLocation, useNavigate} from 'react-router-dom'
 import axiosInstance from '../utils/helper.js';
 
 const Login = () => {
 
+  const location = useLocation()
   const navigate = useNavigate()
   const {backendUrl, userData, setUserData, getUserData} = useContext(UserContext)
   
@@ -48,7 +49,9 @@ const Login = () => {
           localStorage.setItem('token', data.token)
           await getUserData()
           toast.success(data?.message)
-          navigate('/dashboard')
+          const from = location.state?.from
+          if (from) navigate(from)
+          else navigate('/dashboard')
         } else {
           toast.error(data?.message)
         }

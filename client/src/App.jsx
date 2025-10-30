@@ -8,6 +8,7 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css';
 import { useContext } from 'react'
 import { UserContext } from './context/UserContext'
+import InviteJoin from './pages/InviteJoin'
 
 const App = () => {
   const {token} = useContext(UserContext)
@@ -19,6 +20,7 @@ const App = () => {
         <Route path='/' element={<Hero />} />
         <Route path='/board/:boardId' element={token ? <Board/> : <Navigate to="/login" />}/>
         <Route path='/dashboard' element={token ? <Dashboard/> : <Navigate to="/login" />}></Route>
+        <Route path='/join/:inviteToken' element={<InviteJoin/>}/>
 
         <Route path='/aisehi' element={<Aisehi/>}/>
       </Routes>

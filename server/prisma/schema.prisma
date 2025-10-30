@@ -14,42 +14,67 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
 model User {
-  id      Int      @id @default(autoincrement())
-  email   String   @unique
-  name    String?
-  password_hash String
-  createdAt DateTime @default(now())
-  isAuthenticated Boolean @default(false)
+  id              Int           @id @default(autoincrement())
+  email           String        @unique
+  name            String?
+  password_hash   String
+  createdAt       DateTime      @default(now())
+  isAuthenticated Boolean       @default(false)
+  boards          Board[]
+  events          Event[]
+  board_members   BoardMember[]
+
   @@map(name: "users")
-  boards  Board[]
-  events  Event[]
 }
 
 model Board {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String
-  authorId  Int
-  author    User     @relation(fields: [authorId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@map(name: "boards")
-  events    Event[]
-}
+  id          Int           @id @default(autoincrement())
+  title       String
+  content     String
+  authorId    Int
+  author      User          @relation(fields: [authorId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  events      Event[]
+  board_members BoardMember[]
+  board_invites BoardInvite[]
 
+  @@map(name: "boards")
+}
+  
 model Event {
-  id Int @id @default(autoincrement())
-  board_id Int 
-  user_id  Int 
-  event_type    String
-  event_data Json 
-  createdAt DateTime @default(now())
-  board Board @relation(fields: [board_id], references: [id])
-  user User @relation(fields: [user_id], references: [id])
+  id         Int      @id @default(autoincrement())
+  board_id   Int
+  user_id    Int
+  event_type String
+  event_data Json
+  createdAt  DateTime @default(now())
+  board      Board    @relation(fields: [board_id], references: [id])
+  user       User     @relation(fields: [user_id], references: [id])
+
   @@map(name: "events")
 }
 
-  
+model BoardMember {
+  id      Int    @id @default(autoincrement())
+  boardId Int
+  userId  Int
+  role    String @default("collaborator")
+
+  board Board @relation(fields: [boardId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([boardId, userId])
+  @@map(name: "board_members")
+}
+
+model BoardInvite {
+  id        Int      @id @default(autoincrement())
+  boardId   Int
+  token     String   @unique
+  createdAt DateTime @default(now())
+  board     Board    @relation(fields: [boardId], references: [id])
+
+  @@map(name: "board_invites")
+}

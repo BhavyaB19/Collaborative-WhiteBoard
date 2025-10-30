@@ -1,4 +1,5 @@
 import prisma from '../db.js'
+import {v4 as uuidv4} from 'uuid'
 
 //Get all boards
 export const getAllBoards = async (req, res) => {
@@ -107,5 +108,64 @@ export const clearBoardEvents = async (req,res) => {
         res.json({success: true, message: "Board events cleared"})
     } catch (error) {
         res.json({success: false, error: error.message})
+    }
+}
+
+export const createInvite = async (req, res) => {
+    try {
+        const { boardId } = req.params
+        const user = req.user
+        if (!user) return res.status(401).json({ success: false, message: "Unauthorized"})
+
+        const board = await prisma.board.findUnique({ where: { id: Number(boardId) } })
+        if (!board) return res.status(404).json({ success: false, message: "Board not found" })
+        
+        if (board.authorId !== user.id) {
+            const membership = await prisma.boardMember.findUnique({ where: { boardId_userId: {boardId: Number(boardId), userId: user.id} } })
+            if (!membership) return res.status(403).json({ success: false, message: "Forbidden"})
+        }
+        
+        const inviteToken = uuidv4()
+        const invite = await prisma.boardInvite.create({
+            data : {
+                boardId: Number(boardId),
+                token: inviteToken
+            }
+        })
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173'
+        const link = `${clientUrl}/join/${inviteToken}`
+
+        res.json({ success: true, data: { inviteId: invite.id, link, inviteToken } })
+    } catch (error) {
+        return res.json({success: false, error: error.message})
+    }
+}
+
+export const acceptInvite = async (req, res) => {
+    try {
+        const { inviteToken } = req.body
+        const user = req.user
+        if (!user) return res.status(401).json({ success: false, message: "Unauthorized"})
+
+        const invite = await prisma.boardInvite.findUnique({ where: { token: inviteToken } })
+        if (!invite) return res.status(404).json({ success: false, message: "Invite not found" })
+
+        const boardId = invite.boardId
+
+        const existing = await prisma.boardMember.findUnique({
+            where: { boardId_userId: { boardId: Number(boardId), userId: user.id } }
+        })
+        if (!existing) {
+            await prisma.boardMember.create({
+                data: {
+                    boardId: invite.boardId,
+                    userId: user.id,
+                    role: 'collaborator'
+                }
+            })
+        }
+        res.json({ success: true, message: "Joined board successfully", data: { boardId } })
+    } catch (error) {
+        return res.json({success: false, error: error.message})
     }
 }

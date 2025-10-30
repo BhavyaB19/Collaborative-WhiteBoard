@@ -10,6 +10,7 @@ import Canvas from '../components/Canvas'
 import { useParams } from 'react-router-dom'
 import { boardEventService } from '../utils/boardEventService'
 import { toast } from 'react-toastify';
+import axiosInstance from '../utils/helper'
 
 const Board = () => {
 
@@ -144,15 +145,19 @@ const Board = () => {
     window.location.href = '/dashboard'
   }
 
-  const copyUrlLink = () => {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url)
-      .then(() => {
-        toast.success('Link copied to clipboard!');
-      })
-      .catch((err) => {
-        console.error('Failed to copy link: ', err);
-      });
+  const handleShare = async (boardId) => {
+    try {
+      const { data } = await axiosInstance.post(`/api/boards/${boardId}/invite`)
+      if (data.success) {
+        const link = data.data.link
+        await navigator.clipboard.writeText(link)
+        toast.success("Invite link copied to clipboard!")
+      } else {
+        toast.error(data.message || "Failed to generate invite link") 
+      }
+    } catch (error) {
+      toast.error(error.message)
+    }
   }
 
   return (
@@ -210,7 +215,7 @@ const Board = () => {
           </div>
         </div>
 
-        <button className='bg-[#215AC8] text-white text-md h-10 relative top-7 font-bold flex justify-center items-center gap-2 rounded-sm px-3 hover:bg-blue-700' onClick={copyUrlLink}>
+        <button className='bg-[#215AC8] text-white text-md h-10 relative top-7 font-bold flex justify-center items-center gap-2 rounded-sm px-3 hover:bg-blue-700' onClick={() => handleShare(boardId)}>
           Share Link
           <img src={sharelink} />
         </button>
