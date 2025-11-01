@@ -7,18 +7,11 @@ dotenv.config();
 import prisma from './db.js';
 import userRouter from './routes/userRoute.js';
 import boardRouter from './routes/boardRoute.js';
-import { Server } from 'socket.io';
-
+import jwt from 'jsonwebtoken';
+import { attachSocket } from './socket.js';
 
 const app = express();
 const server = http.createServer(app);
-
-const io = new Server(server, {
-    cors: {
-        origin: "http://localhost:5173",
-        methods: ["GET", "POST", "PUT", "DELETE"]
-    }
-})
 
 const allowedOrigins = ['http://localhost:5173']
 
@@ -26,25 +19,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(cors({credentials: true, origin: allowedOrigins}));
 
-io.on('connection', (socket) => {
-    console.log('New user connected:', socket.id);
-
-    socket.on('join-board', async ({ boardId, userId }) => {
-        socket.join(`board-${boardId}`);
-        console.log(`User ${userId} joined board-${boardId}`);
-    })
-
-    socket.on('draw-event', async (data) => {
-        const { boardId, event } = data;
-        // await prisma.boardEvent.create({})
-        
-        socket.to(`board-${boardId}`).emit('receive-event', event);
-    })
-
-    socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-    })
-})
+attachSocket(server, { corsOrigin: allowedOrigins[0] });
 
 // API Endpoints
 app.get('/', (req, res) => res.send('API is running...'));

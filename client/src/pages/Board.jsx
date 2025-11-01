@@ -5,17 +5,23 @@ import circle from '../assets/circle.svg'
 import eraser from '../assets/eraser.svg'
 import menu from '../assets/menu.svg'
 import sharelink from '../assets/sharelink.svg'
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useContext } from 'react';
 import Canvas from '../components/Canvas'
 import { useParams } from 'react-router-dom'
 import { boardEventService } from '../utils/boardEventService'
 import { toast } from 'react-toastify';
 import axiosInstance from '../utils/helper'
+import { io } from 'socket.io-client';
+import { UserContext } from '../context/UserContext'
 
 const Board = () => {
 
   const canvasRef = useRef(null);
+  const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
+
   const { boardId } = useParams();
+  const { userData, backendUrl }= useContext(UserContext)
 
   const [tool, setTool] = useState('pen');  
   const [mode, setMode] = useState("draw");
@@ -29,6 +35,40 @@ const Board = () => {
       loadBoardEvents()
     }
   }, [boardId])
+
+  
+  useEffect(() => {
+    if (!boardId || !userData) return;
+
+    // send token via auth so server can verify (get from localStorage)
+    const token = localStorage.getItem('token');
+    socketRef.current = io(backendUrl, { auth: { token }, withCredentials: true });
+    setSocket(socketRef.current);
+
+    const socket = socketRef.current;
+    socket.on('connect', () => {
+      console.log('Connected to server', socket.id);
+      socket.emit('joinRoom', { boardId });
+    });
+
+    socket.on('joinError', (err) => {
+      console.error('joinError', err);
+      // show error and redirect if needed
+    });
+
+    socket.on('initialEvents', (events) => {
+      // Canvas will handle replay if it listens to 'initialEvents'
+      socket.emit('clientReady', { boardId }); // optional
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from server');
+    })
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [boardId, userData, backendUrl]);
 
   const loadBoardEvents = async () => {
     setIsLoading(true)
@@ -221,7 +261,7 @@ const Board = () => {
         </button>
       </div>
 
-      <Canvas canvasRef={canvasRef} tool={tool} mode={mode} handleHistory={handleHistory} boardId={boardId} onEventSaved={handleEventSaved}/>
+      <Canvas canvasRef={canvasRef} tool={tool} mode={mode} handleHistory={handleHistory} boardId={boardId} onEventSaved={handleEventSaved} socket={socket}/>
       
     </div>
   )
