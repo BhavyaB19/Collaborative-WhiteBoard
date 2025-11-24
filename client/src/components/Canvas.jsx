@@ -48,14 +48,14 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved, so
         });
 
         // Listen for initial events
-        socket.on('initialEvents', (events) => {
-            console.log('Canvas: Received initialEvents', events.length);
-            replayEvents(events);
-        });
+        // socket.on('initialEvents', (events) => {
+        //     console.log('Canvas: Received initialEvents', events.length);
+        //     replayEvents(events);
+        // });
 
         return () => {
             socket.off('remoteDrawing');
-            socket.off('initialEvents');
+            //socket.off('initialEvents');
         };
     }, [socket, boardId]);
 

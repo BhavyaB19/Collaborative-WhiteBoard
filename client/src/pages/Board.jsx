@@ -50,7 +50,13 @@ const Board = () => {
 
     // send token via auth so server can verify (get from localStorage)
     const token = localStorage.getItem('token');
-    socketRef.current = io(backendUrl, { auth: { token }, withCredentials: true });
+    socketRef.current = io(backendUrl, {
+      auth: { token },
+      withCredentials: true,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5
+    });
 
     const socket = socketRef.current;
 
@@ -92,6 +98,9 @@ const Board = () => {
       clearTimeout(fallbackTimer);
       console.log('Board: received initialEvents', events?.length ?? 0);
       setEvents(events || []);
+      if (events && events.length > 0) {
+        replayEvents(events);
+      }
     });
 
     socket.on('reconnect', (attempt) => {
@@ -138,7 +147,7 @@ const Board = () => {
       socket.off('connect_error');
       socket.off('eventSaved');
       socket.off('disconnect');
-      try {socket.disconnect()} catch (err) {};
+      //try {socket.disconnect()} catch (err) {};
     }
   }, [boardId, userData, backendUrl]);
 
@@ -163,12 +172,14 @@ const Board = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     events.forEach(event => {
-      const eventData = event.event_data
+      const eventData = typeof event.event_data === 'string'? JSON.parse(event.event_data) : event.event_data;
+      //const eventData = event.event_data
       drawEvent(eventData)
     });
   }
 
   const drawEvent = async (eventData) => {
+    const data = typeof eventData === 'string' ? JSON.parse(eventData) : eventData
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     ctx.strokeStyle = "white";
