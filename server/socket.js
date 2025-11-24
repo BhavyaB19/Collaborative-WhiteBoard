@@ -82,10 +82,10 @@ export function attachSocket(server, { corsOrigin }) {
                 }
             })
 
-            socket.on('disconnect', () => {
-                console.log('User disconnected:', socket.id);
-                socket.to(String(boardId)).emit('userLeft', { userId: socket.id });
-            });
+            // socket.on('disconnect', () => {
+            //     console.log('User disconnected:', socket.id);
+            //     socket.to(String(boardId)).emit('userLeft', { userId: socket.id });
+            // });
     })
     return io
 }

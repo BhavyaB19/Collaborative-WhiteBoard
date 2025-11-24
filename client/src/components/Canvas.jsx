@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { boardEventService } from '../utils/boardEventService';
 
-const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) => {
+const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved, socket}) => {
 
     
     const [isDrawing, setIsDrawing] = useState(false);
@@ -34,6 +34,93 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) =
         }, []
     );
 
+    useEffect(() => {
+        if (!socket || !boardId) {
+            return;
+        }
+
+        console.log('Canvas: Setting up socket listeners');
+
+        // Listen for remote drawing from other users
+        socket.on('remoteDrawing', (eventData) => {
+            console.log('Canvas: Received remoteDrawing', eventData);
+            drawEventOnCanvas(eventData);
+        });
+
+        // Listen for initial events
+        socket.on('initialEvents', (events) => {
+            console.log('Canvas: Received initialEvents', events.length);
+            replayEvents(events);
+        });
+
+        return () => {
+            socket.off('remoteDrawing');
+            socket.off('initialEvents');
+        };
+    }, [socket, boardId]);
+
+    const replayEvents = (events) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        events.forEach(event => {
+            const eventData = typeof event.event_data === 'string' 
+                ? JSON.parse(event.event_data) 
+                : event.event_data;
+            drawEventOnCanvas(eventData);
+        });
+    };
+
+    const drawEventOnCanvas = (eventData) => {
+        const ctx = getCtx();
+        if (!ctx) return;
+
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 2;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        if (eventData.type === 'pen') {
+            ctx.beginPath();
+            ctx.moveTo(eventData.path[0].x, eventData.path[0].y);
+            eventData.path.forEach(point => {
+                ctx.lineTo(point.x, point.y);
+            });
+            ctx.stroke();
+        } else if (eventData.type === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.lineWidth = eraserSize;
+            ctx.beginPath();
+            ctx.moveTo(eventData.path[0].x, eventData.path[0].y);
+            eventData.path.forEach(point => {
+                ctx.lineTo(point.x, point.y);
+            });
+            ctx.stroke();
+            ctx.globalCompositeOperation = 'source-over';
+        } else if (eventData.type === 'line') {
+            ctx.beginPath();
+            ctx.moveTo(eventData.startPos.x, eventData.startPos.y);
+            ctx.lineTo(eventData.endPos.x, eventData.endPos.y);
+            ctx.stroke();
+        } else if (eventData.type === 'square') {
+            ctx.beginPath();
+            ctx.rect(eventData.startPos.x, eventData.startPos.y, 
+                     eventData.endPos.x - eventData.startPos.x, 
+                     eventData.endPos.y - eventData.startPos.y);
+            ctx.stroke();
+        } else if (eventData.type === 'circle') {
+            ctx.beginPath();
+            const radius = Math.sqrt(
+                Math.pow(eventData.endPos.x - eventData.startPos.x, 2) + 
+                Math.pow(eventData.endPos.y - eventData.startPos.y, 2)
+            );
+            ctx.arc(eventData.startPos.x, eventData.startPos.y, radius, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
+    };
+
     const getCtx = () => {
         const canvas = canvasRef.current;
         if (!canvas) return null;
@@ -56,14 +143,21 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) =
     }
 
     const saveEventToBackend = async (eventData) => {
-        try {
-            const result = await boardEventService.saveEvent(boardId, eventData.type, eventData)
-            if (onEventSaved) {
-                onEventSaved(result.data)
-            }
-        } catch (error) {
-            console.error("Failed to save event:", error)
-        }
+        if (!socket || !boardId) return;
+
+        console.log('Canvas: Emitting drawing event', eventData);
+
+        // Emit to socket for real-time broadcasting to other users
+        socket.emit('drawing', {
+            boardId,
+            eventData
+        });
+
+        // Save to database
+        socket.emit('saveEvent', {
+            boardId,
+            eventData
+        });
     }
 
     const startDraw = (e) => {
@@ -82,7 +176,7 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) =
             };
             setCurrentEvent(eventData);
         }
-        // Save canvas state before starting shape
+        
         if (tool === 'line' || tool === 'square' || tool === 'circle') {
             const canvas = canvasRef.current;
             const data = canvas.toDataURL('image/png');
@@ -93,7 +187,7 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) =
             ctx.beginPath()
             ctx.lineCap = "round"
             ctx.lineJoin = "round"
-            ctx.strokeStyle = "white" //mode === "draw" ? "white" : "black" Check this line afterwards
+            ctx.strokeStyle = "white"
             ctx.moveTo(pos.x, pos.y)
         }  else if (tool === "eraser") {
             ctx.globalCompositeOperation = 'destination-out'
@@ -118,7 +212,7 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) =
               ...prev,
               path: [...prev.path, pos]
             }));
-          }
+        }
 
         if (tool === 'pen') {
             ctx.lineTo(pos.x, pos.y)
@@ -127,7 +221,6 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) =
             ctx.lineTo(pos.x, pos.y)
             ctx.stroke()
         } else if (tool === 'line' || tool === 'square' || tool === 'circle') {
-            // Restore saved state and draw dotted preview
             if (savedCanvasState) {
                 const canvas = canvasRef.current;
                 const dpr = window.devicePixelRatio || 1;
@@ -136,11 +229,10 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) =
                     ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
                     ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
                     
-                    // Draw dotted preview
                     ctx.beginPath();
                     ctx.strokeStyle = "white";
                     ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]); // Dotted line
+                    ctx.setLineDash([5, 5]);
                     
                     if (tool === 'line') {
                         ctx.moveTo(startPos.x, startPos.y);
@@ -153,7 +245,7 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) =
                     }
                     
                     ctx.stroke();
-                    ctx.setLineDash([]); // Reset to solid line
+                    ctx.setLineDash([]);
                 };
                 img.src = savedCanvasState;
             }
@@ -166,28 +258,34 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved}) =
         const ctx = getCtx()
         if (!ctx) return;
 
-        // Save event to backend
+        const pos = getPosFromEvents(e);
+
+        // Save pen/eraser strokes
         if (currentEvent && boardId) {
             saveEventToBackend(currentEvent);
             setCurrentEvent(null)
         }
+        
         if (tool === "eraser") {
             ctx.globalCompositeOperation = 'source-over'
         }
 
+        // Save shapes (line, square, circle)
         if(tool !== 'pen' && tool !== 'eraser' && startPos) {
-            const pos = getPosFromEvents(e);
             const shapeEvent = {
                 type: tool,
                 startPos,
                 endPos: pos
-              };
+            };
               
-              if (boardId) {
+            if (boardId) {
                 saveEventToBackend(shapeEvent);
-              }
+            }
+            
             ctx.beginPath()
             ctx.strokeStyle = "white"
+            ctx.lineWidth = 2;
+            
             if (tool === 'line') {
                 ctx.moveTo(startPos.x, startPos.y)
                 ctx.lineTo(pos.x, pos.y)

@@ -19,6 +19,7 @@ const Board = () => {
   const canvasRef = useRef(null);
   const socketRef = useRef(null);
   const [socket, setSocket] = useState(null);
+  const [isSocketReady, setIsSocketReady] = useState(false);
 
   const { boardId } = useParams();
   const { userData, backendUrl }= useContext(UserContext)
@@ -40,15 +41,45 @@ const Board = () => {
   useEffect(() => {
     if (!boardId || !userData) return;
 
+    if (socketRef.current && socketRef.current.connected) {
+      setSocket(socketRef.current);
+      setIsSocketReady(true);
+      socketRef.current.emit('joinRoom', { boardId });
+      return;
+    }
+
     // send token via auth so server can verify (get from localStorage)
     const token = localStorage.getItem('token');
     socketRef.current = io(backendUrl, { auth: { token }, withCredentials: true });
-    setSocket(socketRef.current);
 
     const socket = socketRef.current;
+
+    let initialEventsReceived = false;
+    let fallbackTimer = null;
+
+    const startFallbackTimer = () => {
+      clearTimeout(fallbackTimer);
+        fallbackTimer = setTimeout(async () => {
+          if (!initialEventsReceived) {
+            console.warn('Board: initialEvents not received, falling back to HTTP load');
+            try {
+              const result = await boardEventService.getEvents(boardId);
+              if (result?.success) {
+                setEvents(result.data || []);
+              }
+            } catch (err) {
+              console.error('Board: fallback load failed', err);
+            }
+          }
+      }, 1500);
+   };
+
     socket.on('connect', () => {
       console.log('Connected to server', socket.id);
+      setSocket(socket);
+      setIsSocketReady(true);
       socket.emit('joinRoom', { boardId });
+      startFallbackTimer();
     });
 
     socket.on('joinError', (err) => {
@@ -57,17 +88,58 @@ const Board = () => {
     });
 
     socket.on('initialEvents', (events) => {
-      // Canvas will handle replay if it listens to 'initialEvents'
-      socket.emit('clientReady', { boardId }); // optional
+      initialEventsReceived = true;
+      clearTimeout(fallbackTimer);
+      console.log('Board: received initialEvents', events?.length ?? 0);
+      setEvents(events || []);
     });
 
-    socket.on('disconnect', () => {
-      console.log('Disconnected from server');
+    socket.on('reconnect', (attempt) => {
+      console.log('Reconnected to server on attempt:', attempt);
+      if (boardId) socket.emit('joinRoom', { boardId });
+      startFallbackTimer();     
     })
 
+    socket.on('connect_error', (err) => {
+      console.error('Board: socket connect_error', err);
+      // fallback to HTTP immediately if socket can't connect
+      (async () => {
+        try {
+          const result = await boardEventService.getEvents(boardId);
+          if (result?.success) setEvents(result.data || []);
+        } catch (e) {
+          console.error('Board: http fallback failed', e);
+        }
+      })();
+    });
+
+    socket.on('eventSaved', (data) => {
+      setEvents(prev => {
+        if (!data) return prev;
+        const exists = prev.find(e => e.id === data.id);
+        if (exists) return prev;
+        return [...prev, data];
+      });
+    });
+    
+    socket.on('disconnect', (reason) => {
+      console.log('Disconnected from server', reason);
+      setIsSocketReady(false);
+      setSocket(null);
+    })
+
+    startFallbackTimer();
+
     return () => {
-      socket.disconnect();
-    };
+      clearTimeout(fallbackTimer);
+      socket.off('connect');
+      socket.off('initialEvents');
+      socket.off('reconnect');
+      socket.off('connect_error');
+      socket.off('eventSaved');
+      socket.off('disconnect');
+      try {socket.disconnect()} catch (err) {};
+    }
   }, [boardId, userData, backendUrl]);
 
   const loadBoardEvents = async () => {
