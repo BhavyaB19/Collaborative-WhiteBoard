@@ -19,6 +19,7 @@ const Board = () => {
   const canvasRef = useRef(null);
   const socketRef = useRef(null);
   const [socket, setSocket] = useState(null);
+  const [isSocketReady, setIsSocketReady] = useState(false);
 
   const { boardId } = useParams();
   const { userData, backendUrl }= useContext(UserContext)
@@ -29,6 +30,7 @@ const Board = () => {
   const [index, setIndex] = useState(-1);
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeUsers, setActiveUsers] = useState([]);
 
   useEffect(() => {
     if (boardId) {
@@ -40,15 +42,51 @@ const Board = () => {
   useEffect(() => {
     if (!boardId || !userData) return;
 
+    if (socketRef.current && socketRef.current.connected) {
+      setSocket(socketRef.current);
+      setIsSocketReady(true);
+      socketRef.current.emit('joinRoom', { boardId });
+      return;
+    }
+
     // send token via auth so server can verify (get from localStorage)
     const token = localStorage.getItem('token');
-    socketRef.current = io(backendUrl, { auth: { token }, withCredentials: true });
-    setSocket(socketRef.current);
+    socketRef.current = io(backendUrl, {
+      auth: { token },
+      withCredentials: true,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5
+    });
 
     const socket = socketRef.current;
+
+    let initialEventsReceived = false;
+    let fallbackTimer = null;
+
+    const startFallbackTimer = () => {
+      clearTimeout(fallbackTimer);
+        fallbackTimer = setTimeout(async () => {
+          if (!initialEventsReceived) {
+            console.warn('Board: initialEvents not received, falling back to HTTP load');
+            try {
+              const result = await boardEventService.getEvents(boardId);
+              if (result?.success) {
+                setEvents(result.data || []);
+              }
+            } catch (err) {
+              console.error('Board: fallback load failed', err);
+            }
+          }
+      }, 1500);
+   };
+
     socket.on('connect', () => {
       console.log('Connected to server', socket.id);
+      setSocket(socket);
+      setIsSocketReady(true);
       socket.emit('joinRoom', { boardId });
+      startFallbackTimer();
     });
 
     socket.on('joinError', (err) => {
@@ -57,17 +95,68 @@ const Board = () => {
     });
 
     socket.on('initialEvents', (events) => {
-      // Canvas will handle replay if it listens to 'initialEvents'
-      socket.emit('clientReady', { boardId }); // optional
+      initialEventsReceived = true;
+      clearTimeout(fallbackTimer);
+      console.log('Board: received initialEvents', events?.length ?? 0);
+      setEvents(events || []);
+      if (events && events.length > 0) {
+        replayEvents(events);
+      }
     });
 
-    socket.on('disconnect', () => {
-      console.log('Disconnected from server');
+    socket.on('reconnect', (attempt) => {
+      console.log('Reconnected to server on attempt:', attempt);
+      if (boardId) socket.emit('joinRoom', { boardId });
+      startFallbackTimer();     
     })
 
+    socket.on('connect_error', (err) => {
+      console.error('Board: socket connect_error', err);
+      // fallback to HTTP immediately if socket can't connect
+      (async () => {
+        try {
+          const result = await boardEventService.getEvents(boardId);
+          if (result?.success) setEvents(result.data || []);
+        } catch (e) {
+          console.error('Board: http fallback failed', e);
+        }
+      })();
+    });
+
+    socket.on('eventSaved', (data) => {
+      setEvents(prev => {
+        if (!data) return prev;
+        const exists = prev.find(e => e.id === data.id);
+        if (exists) return prev;
+        return [...prev, data];
+      });
+    });
+
+    socket.on('activeUsers', (users) => {
+      console.log('Active users updated:', users);
+      setActiveUsers(users || []);
+    });
+    
+    socket.on('disconnect', (reason) => {
+      console.log('Disconnected from server', reason);
+      setIsSocketReady(false);
+      setSocket(null);
+      setActiveUsers([]);
+    })
+
+    startFallbackTimer();
+
     return () => {
-      socket.disconnect();
-    };
+      clearTimeout(fallbackTimer);
+      socket.off('connect');
+      socket.off('initialEvents');
+      socket.off('reconnect');
+      socket.off('connect_error');
+      socket.off('eventSaved');
+      socket.off('activeUsers');
+      socket.off('disconnect');
+      //try {socket.disconnect()} catch (err) {};
+    }
   }, [boardId, userData, backendUrl]);
 
   const loadBoardEvents = async () => {
@@ -91,12 +180,14 @@ const Board = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     events.forEach(event => {
-      const eventData = event.event_data
+      const eventData = typeof event.event_data === 'string'? JSON.parse(event.event_data) : event.event_data;
+      //const eventData = event.event_data
       drawEvent(eventData)
     });
   }
 
   const drawEvent = async (eventData) => {
+    const data = typeof eventData === 'string' ? JSON.parse(eventData) : eventData
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     ctx.strokeStyle = "white";
@@ -263,6 +354,22 @@ const Board = () => {
 
       <Canvas canvasRef={canvasRef} tool={tool} mode={mode} handleHistory={handleHistory} boardId={boardId} onEventSaved={handleEventSaved} socket={socket}/>
       
+      {/* Active Users Box */}
+      {activeUsers.length > 0 && (
+        <div className='fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-[#232329] text-white px-6 py-3 rounded-lg shadow-lg border border-gray-700'>
+          <div className='flex items-center gap-3'>
+            <span className='text-sm font-semibold'>Active Users:</span>
+            <div className='flex gap-2'>
+              {activeUsers.map((user, index) => (
+                <div key={user.socketId} className='flex items-center gap-1 bg-[#121212] px-3 py-1 rounded-full'>
+                  <div className='w-2 h-2 bg-green-500 rounded-full'></div>
+                  <span className='text-sm'>{user.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

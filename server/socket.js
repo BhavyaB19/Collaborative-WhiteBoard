@@ -8,6 +8,9 @@ export function attachSocket(server, { corsOrigin }) {
         cors: { origin: corsOrigin || 'http://localhost:5173', credentials: true }
     });
 
+    // Track active users per board: { boardId: [{ socketId, userId, name }] }
+    const activeUsers = new Map();
+
     async function authenticateSocket(socket) {
         try {
             let token = socket.handshake.auth?.token;
@@ -51,12 +54,26 @@ export function attachSocket(server, { corsOrigin }) {
                 }
                 socket.join(String(boardId));
 
+                // Store user info with socket
+                socket.userId = user.id;
+                socket.userName = user.name;
+                socket.currentBoardId = String(boardId);
+
+                // Add user to active users list
+                if (!activeUsers.has(String(boardId))) {
+                    activeUsers.set(String(boardId), []);
+                }
+                const boardUsers = activeUsers.get(String(boardId));
+                boardUsers.push({ socketId: socket.id, userId: user.id, name: user.name });
+
                 const events = await prisma.event.findMany({ 
                     where: { board_id: Number(boardId) },
                     orderBy: { createdAt: 'asc' }
                 })
                 socket.emit('initialEvents',  events );
-                socket.to(String(boardId)).emit('userJoined', { userId: user.id, name: user.name})
+
+                // Notify all users in the room about updated user list
+                io.to(String(boardId)).emit('activeUsers', boardUsers);
             })
 
             socket.on('drawing', ({ boardId, eventData }) => {
@@ -84,7 +101,18 @@ export function attachSocket(server, { corsOrigin }) {
 
             socket.on('disconnect', () => {
                 console.log('User disconnected:', socket.id);
-                socket.to(String(boardId)).emit('userLeft', { userId: socket.id });
+                
+                // Remove user from active users list
+                if (socket.currentBoardId) {
+                    const boardUsers = activeUsers.get(socket.currentBoardId);
+                    if (boardUsers) {
+                        const updatedUsers = boardUsers.filter(u => u.socketId !== socket.id);
+                        activeUsers.set(socket.currentBoardId, updatedUsers);
+                        
+                        // Notify remaining users about updated user list
+                        io.to(socket.currentBoardId).emit('activeUsers', updatedUsers);
+                    }
+                }
             });
     })
     return io
