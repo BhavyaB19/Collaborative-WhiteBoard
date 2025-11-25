@@ -30,6 +30,7 @@ const Board = () => {
   const [index, setIndex] = useState(-1);
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeUsers, setActiveUsers] = useState([]);
 
   useEffect(() => {
     if (boardId) {
@@ -130,11 +131,17 @@ const Board = () => {
         return [...prev, data];
       });
     });
+
+    socket.on('activeUsers', (users) => {
+      console.log('Active users updated:', users);
+      setActiveUsers(users || []);
+    });
     
     socket.on('disconnect', (reason) => {
       console.log('Disconnected from server', reason);
       setIsSocketReady(false);
       setSocket(null);
+      setActiveUsers([]);
     })
 
     startFallbackTimer();
@@ -146,6 +153,7 @@ const Board = () => {
       socket.off('reconnect');
       socket.off('connect_error');
       socket.off('eventSaved');
+      socket.off('activeUsers');
       socket.off('disconnect');
       //try {socket.disconnect()} catch (err) {};
     }
@@ -346,6 +354,22 @@ const Board = () => {
 
       <Canvas canvasRef={canvasRef} tool={tool} mode={mode} handleHistory={handleHistory} boardId={boardId} onEventSaved={handleEventSaved} socket={socket}/>
       
+      {/* Active Users Box */}
+      {activeUsers.length > 0 && (
+        <div className='fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-[#232329] text-white px-6 py-3 rounded-lg shadow-lg border border-gray-700'>
+          <div className='flex items-center gap-3'>
+            <span className='text-sm font-semibold'>Active Users:</span>
+            <div className='flex gap-2'>
+              {activeUsers.map((user, index) => (
+                <div key={user.socketId} className='flex items-center gap-1 bg-[#121212] px-3 py-1 rounded-full'>
+                  <div className='w-2 h-2 bg-green-500 rounded-full'></div>
+                  <span className='text-sm'>{user.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
