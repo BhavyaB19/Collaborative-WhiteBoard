@@ -26,8 +26,8 @@ app.get('/', (req, res) => res.send('API is running...'));
 app.use('/api/users', userRouter);  // Use the user routes
 app.use('/api/boards', boardRouter)
 
-const port = 7000;
-server.listen(port, () => console.log(`Server is running on port ${port}`))
+// const port = 7000;
+// server.listen(port, () => console.log(`Server is running on port ${port}`))
 
 
 
