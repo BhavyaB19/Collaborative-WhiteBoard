@@ -31,4 +31,4 @@ app.use('/api/boards', boardRouter)
 
 
 
-export default app //server 
+export default server 
