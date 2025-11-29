@@ -27,7 +27,7 @@ app.use('/api/users', userRouter);  // Use the user routes
 app.use('/api/boards', boardRouter)
 
 const PORT = process.env.PORT || 7000;
-server.listen(PORT, () => console.log(`Server is running on port ${port}`))
+server.listen(PORT, () => console.log(`Server is running on port ${PORT}`))
 
 
 
