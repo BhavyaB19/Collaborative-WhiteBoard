@@ -5,7 +5,7 @@ import prisma from './db.js';
 export function attachSocket(server, { corsOrigin }) {
     
     const io = new Server(server, {
-        cors: { origin: corsOrigin || 'http://localhost:5173', credentials: true }
+        cors: { origin: '*', credentials: true }
     });
 
     // Track active users per board: { boardId: [{ socketId, userId, name }] }

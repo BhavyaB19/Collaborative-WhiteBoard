@@ -17,7 +17,7 @@ const allowedOrigins = [process.env.CLIENT_URL || 'http://localhost:5173']
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({credentials: true, origin: allowedOrigins}));
+app.use(cors({credentials: true, origin: "*"}));
 
 attachSocket(server, { corsOrigin: allowedOrigins[0] });
 
