@@ -56,10 +56,11 @@ const Dashboard = () => {
         setShowCreateModal(false);
         setNewBoard({ title: '', description: '' });
       } else {
-        toast.error("yoyo")
+        toast.error(response.data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      const errorMessage = error.response?.data?.message
+      toast.error(errorMessage);
     }
   }
 

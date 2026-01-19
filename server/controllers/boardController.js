@@ -31,14 +31,14 @@ export const createWhiteboard = async (req, res) => {
     const { title, content } = req.body;
     try {
         if (!title || !content) {
-          return res.status(400).json({ error: "Missing required fields" });
+          return res.status(400).json({ success: false, message: "Title and content are required"});
         }
         const board = await prisma.board.create({
             data: { title, content, authorId: req.user.id }
         })
         res.json({success: true, data: board})
     } catch (error) {
-        res.json({success: false, error: error.message})
+        res.status(500).json({success: false, error: error.message})
     }
 }
 
