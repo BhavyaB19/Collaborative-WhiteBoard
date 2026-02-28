@@ -271,8 +271,6 @@ model Event {
 ## 🚧 Future Enhancements
 
 ### Planned Features
-- **Real-time Collaboration**: Complete Socket.io implementation for live collaboration
-- **User Presence**: Show active users on boards
 - **Board Sharing**: Share boards with specific users or make them public
 - **Export Functionality**: Export boards as images or PDFs
 - **Advanced Drawing Tools**: More drawing tools and customization options
@@ -306,6 +304,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Tailwind CSS for the utility-first CSS framework
 - All contributors and users of this project
 
----
-
-**Note**: This is currently a single-user whiteboard application. Real-time collaboration features are architecturally ready but not fully implemented. The foundation is solid for adding multi-user collaboration in future updates.
