@@ -11,12 +11,23 @@ import { UserContext } from './context/UserContext'
 import InviteJoin from './pages/InviteJoin'
 
 const App = () => {
-  const {token} = useContext(UserContext)
+  const {token, isLoading} = useContext(UserContext)
+
+  // Show nothing while initial auth is resolving to prevent flash of login page
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white text-lg">Loading...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black/50 to-gray-800">
       <ToastContainer/>
       <Routes>
-        <Route path='/login' element={<Login/>} />
+        {/* If already logged in, redirect away from login page */}
+        <Route path='/login' element={token ? <Navigate to="/dashboard" /> : <Login/>} />
         <Route path='/' element={<Hero />} />
         <Route path='/board/:boardId' element={token ? <Board/> : <Navigate to="/login" />}/>
         <Route path='/dashboard' element={token ? <Dashboard/> : <Navigate to="/login" />}></Route>

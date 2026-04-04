@@ -20,6 +20,7 @@ const Board = () => {
   const socketRef = useRef(null);
   const [socket, setSocket] = useState(null);
   const [isSocketReady, setIsSocketReady] = useState(false);
+  const [isCollaborating, setIsCollaborating] = useState(true);
 
   const { boardId } = useParams();
   const { userData, backendUrl }= useContext(UserContext)
@@ -38,28 +39,32 @@ const Board = () => {
     }
   }, [boardId])
 
-  
-  useEffect(() => {
-    if (!boardId || !userData) return;
+  const connectSocket = () => {
+    let sock = socketRef.current;
+    const alreadyConnected = sock && sock.connected;
 
-    if (socketRef.current && socketRef.current.connected) {
-      setSocket(socketRef.current);
-      setIsSocketReady(true);
-      socketRef.current.emit('joinRoom', { boardId });
-      return;
+    // Create a new socket only if one doesn't exist yet
+    if (!sock) {
+      const token = localStorage.getItem('token');
+      sock = io(backendUrl, {
+        auth: { token },
+        withCredentials: true,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5
+      });
+      socketRef.current = sock;
     }
 
-    // send token via auth so server can verify (get from localStorage)
-    const token = localStorage.getItem('token');
-    socketRef.current = io(backendUrl, {
-      auth: { token },
-      withCredentials: true,
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5
-    });
-
-    const socket = socketRef.current;
+    // Always clear old listeners first to avoid duplicates
+    sock.off('connect');
+    sock.off('joinError');
+    sock.off('initialEvents');
+    sock.off('reconnect');
+    sock.off('connect_error');
+    sock.off('eventSaved');
+    sock.off('activeUsers');
+    sock.off('disconnect');
 
     let initialEventsReceived = false;
     let fallbackTimer = null;
@@ -81,20 +86,20 @@ const Board = () => {
       }, 1500);
    };
 
-    socket.on('connect', () => {
-      console.log('Connected to server', socket.id);
-      setSocket(socket);
+    sock.on('connect', () => {
+      console.log('Connected to server', sock.id);
+      setSocket(sock);
       setIsSocketReady(true);
-      socket.emit('joinRoom', { boardId });
+      setIsCollaborating(true);
+      sock.emit('joinRoom', { boardId });
       startFallbackTimer();
     });
 
-    socket.on('joinError', (err) => {
+    sock.on('joinError', (err) => {
       console.error('joinError', err);
-      // show error and redirect if needed
     });
 
-    socket.on('initialEvents', (events) => {
+    sock.on('initialEvents', (events) => {
       initialEventsReceived = true;
       clearTimeout(fallbackTimer);
       console.log('Board: received initialEvents', events?.length ?? 0);
@@ -104,15 +109,14 @@ const Board = () => {
       }
     });
 
-    socket.on('reconnect', (attempt) => {
+    sock.on('reconnect', (attempt) => {
       console.log('Reconnected to server on attempt:', attempt);
-      if (boardId) socket.emit('joinRoom', { boardId });
+      if (boardId) sock.emit('joinRoom', { boardId });
       startFallbackTimer();     
     })
 
-    socket.on('connect_error', (err) => {
+    sock.on('connect_error', (err) => {
       console.error('Board: socket connect_error', err);
-      // fallback to HTTP immediately if socket can't connect
       (async () => {
         try {
           const result = await boardEventService.getEvents(boardId);
@@ -123,7 +127,7 @@ const Board = () => {
       })();
     });
 
-    socket.on('eventSaved', (data) => {
+    sock.on('eventSaved', (data) => {
       setEvents(prev => {
         if (!data) return prev;
         const exists = prev.find(e => e.id === data.id);
@@ -132,30 +136,51 @@ const Board = () => {
       });
     });
 
-    socket.on('activeUsers', (users) => {
+    sock.on('activeUsers', (users) => {
       console.log('Active users updated:', users);
       setActiveUsers(users || []);
     });
     
-    socket.on('disconnect', (reason) => {
+    sock.on('disconnect', (reason) => {
       console.log('Disconnected from server', reason);
       setIsSocketReady(false);
-      setSocket(null);
-      setActiveUsers([]);
+      if (reason === 'io client disconnect') {
+        setSocket(null);
+        setActiveUsers([]);
+        setIsCollaborating(false);
+      }
     })
+
+    // If already connected, join room immediately; otherwise wait for 'connect' event
+    if (alreadyConnected) {
+      setSocket(sock);
+      setIsSocketReady(true);
+      setIsCollaborating(true);
+      sock.emit('joinRoom', { boardId });
+    }
 
     startFallbackTimer();
 
+    return fallbackTimer;
+  };
+
+  useEffect(() => {
+    if (!boardId || !userData) return;
+
+    const fallbackTimer = connectSocket();
+
     return () => {
       clearTimeout(fallbackTimer);
-      socket.off('connect');
-      socket.off('initialEvents');
-      socket.off('reconnect');
-      socket.off('connect_error');
-      socket.off('eventSaved');
-      socket.off('activeUsers');
-      socket.off('disconnect');
-      //try {socket.disconnect()} catch (err) {};
+      if (socketRef.current) {
+        socketRef.current.off('connect');
+        socketRef.current.off('initialEvents');
+        socketRef.current.off('reconnect');
+        socketRef.current.off('connect_error');
+        socketRef.current.off('eventSaved');
+        socketRef.current.off('activeUsers');
+        socketRef.current.off('disconnect');
+        // Don't disconnect on cleanup — let reconnection handle page refresh
+      }
     }
   }, [boardId, userData, backendUrl]);
 
@@ -181,7 +206,6 @@ const Board = () => {
 
     events.forEach(event => {
       const eventData = typeof event.event_data === 'string'? JSON.parse(event.event_data) : event.event_data;
-      //const eventData = event.event_data
       drawEvent(eventData)
     });
   }
@@ -291,54 +315,87 @@ const Board = () => {
     }
   }
 
-  return (
-    <div className='bg-[#121212] h-screen flex flex-col'>
-      {/* Navbar */}
-      <div className='flex justify-between items-center px-5 mb-3'>
+  const handleLeaveCollaboration = () => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+    setSocket(null);
+    setIsSocketReady(false);
+    setIsCollaborating(false);
+    setActiveUsers([]);
+    toast.info("Left collaborative mode — working offline");
+  }
 
-        <div className='text-white text-2xl h-11 bg-[#232329] relative top-7 font-bold flex justify-center items-center gap-4 rounded-sm hover:bg-gray-800 group'>
-          <img src={menu} className='px-2 h-9' />
-          <div className='hidden group-hover:block absolute top-full py-2 px-2 pr-5 left-0 bg-gray-800 border-1 border-gray-200 rounded'>
-            <p className='text-sm font-normal mb-2 hover:scale-105' onClick={takeToDashboard}>Dashboard</p>
-            <p className='text-sm font-normal mb-2 hover:scale-105'>Share Link</p>
-            <p className='text-sm font-normal mb-2 hover:scale-105'>Settings</p>
+  const handleRejoinCollaboration = () => {
+    connectSocket();
+    toast.success("Rejoining collaborative session...");
+  }
+
+  const activeTool = tool;
+
+  return (
+    <div className='bg-[#121212] h-screen flex flex-col overflow-hidden'>
+      {/* Navbar */}
+      <div className='flex justify-between items-center px-4 py-3 flex-shrink-0'>
+
+        <div className='text-white text-2xl h-10 bg-[#232329] font-bold flex justify-center items-center gap-4 rounded-lg hover:bg-[#2a2a32] group relative'>
+          <img src={menu} className='px-2.5 h-8' />
+          <div className='hidden group-hover:block absolute top-full py-2 px-2 pr-5 left-0 bg-[#2a2a32] border border-gray-700 rounded-lg mt-1 z-50 shadow-xl'>
+            <p className='text-sm font-normal mb-2 hover:text-blue-400 cursor-pointer transition-colors' onClick={takeToDashboard}>Dashboard</p>
+            <p className='text-sm font-normal mb-2 hover:text-blue-400 cursor-pointer transition-colors'>Share Link</p>
+            <p className='text-sm font-normal mb-2 hover:text-blue-400 cursor-pointer transition-colors'>Settings</p>
           </div>
         </div>
 
-        <div className='flex justify-center items-center gap-10'>
-          <div className='text-white text-3xl h-11 bg-[#232329] relative top-7 font-bold flex justify-center items-center gap-4 rounded-sm '>
-            <img src={pen} className='px-2  hover:scale-108 h-9' 
-              onClick={() =>setTool('pen')}
-            />
-            <img src={line} className='px-2 h-9 hover:scale-108' 
+        <div className='flex justify-center items-center gap-6'>
+          <div className='text-white text-3xl h-10 bg-[#232329] font-bold flex justify-center items-center gap-1 rounded-lg px-1'>
+            <button 
+              className={`px-2 h-9 rounded-md transition-colors ${activeTool === 'pen' ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
+              onClick={() => setTool('pen')}
+            >
+              <img src={pen} className='h-7' />
+            </button>
+            <button 
+              className={`px-2 h-9 rounded-md transition-colors ${activeTool === 'line' ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
               onClick={() => setTool('line')}
-            />
-            <img src={square} className='px-2 h-9 hover:scale-108'
+            >
+              <img src={line} className='h-7' />
+            </button>
+            <button 
+              className={`px-2 h-9 rounded-md transition-colors ${activeTool === 'square' ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
               onClick={() => setTool('square')}
-            />
-            <img src={circle} className='px-2 h-9 hover:scale-108'
+            >
+              <img src={square} className='h-7' />
+            </button>
+            <button 
+              className={`px-2 h-9 rounded-md transition-colors ${activeTool === 'circle' ? 'bg-blue-500/20' : 'hover:bg-white/5'}`}
               onClick={() => setTool('circle')}
-            />
-            <img src={eraser} className='px-2 h-9 hover:scale-108'
+            >
+              <img src={circle} className='h-7' />
+            </button>
+            <button 
+              className={`px-2 h-9 rounded-md transition-colors ${activeTool === 'eraser' ? 'bg-red-500/20' : 'hover:bg-white/5'}`}
               onClick={() => {
                 setTool('eraser')
                 setMode('erase')
               }}
-            />
+            >
+              <img src={eraser} className='h-7' />
+            </button>
           </div>
 
-          <div className='flex md:gap-4 sm:gap-3'>
-            <button className='text-white text-md h-11 bg-[#232329] relative top-7 font-bold flex justify-center items-center gap-2 rounded-sm px-3 hover:bg-gray-800'
+          <div className='flex gap-2'>
+            <button className='text-white text-sm h-10 bg-[#232329] font-medium flex justify-center items-center gap-2 rounded-lg px-3 hover:bg-[#2a2a32] transition-colors'
             onClick={undo}
             >
               Undo
             </button>
-            <button className='text-white text-md h-11 bg-[#232329] relative top-7 font-bold flex justify-center items-center gap-2 rounded-sm px-3 hover:bg-gray-800'
+            <button className='text-white text-sm h-10 bg-[#232329] font-medium flex justify-center items-center gap-2 rounded-lg px-3 hover:bg-[#2a2a32] transition-colors'
             onClick={redo}
             >
               Redo
             </button>
-            <button className='text-white text-md h-11 bg-[#232329] relative top-7 font-bold flex justify-center items-center gap-2 rounded-sm px-3 hover:bg-gray-800'
+            <button className='text-white text-sm h-10 bg-[#232329] font-medium flex justify-center items-center gap-2 rounded-lg px-3 hover:bg-[#2a2a32] transition-colors'
             onClick={clearCanvas}
             >
               Clear
@@ -346,30 +403,78 @@ const Board = () => {
           </div>
         </div>
 
-        <button className='bg-[#215AC8] text-white text-md h-10 relative top-7 font-bold flex justify-center items-center gap-2 rounded-sm px-3 hover:bg-blue-700' onClick={() => handleShare(boardId)}>
-          Share Link
-          <img src={sharelink} />
-        </button>
+        <div className='flex items-center gap-3'>
+          {/* Collaboration toggle */}
+          {isCollaborating ? (
+            <button
+              onClick={handleLeaveCollaboration}
+              className='text-white text-sm h-10 bg-red-500/10 border border-red-500/30 font-medium flex justify-center items-center gap-2 rounded-lg px-4 hover:bg-red-500/20 transition-colors'
+              title="Leave collaborative session and work offline"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Leave
+            </button>
+          ) : (
+            <button
+              onClick={handleRejoinCollaboration}
+              className='text-white text-sm h-10 bg-emerald-500/10 border border-emerald-500/30 font-medium flex justify-center items-center gap-2 rounded-lg px-4 hover:bg-emerald-500/20 transition-colors'
+              title="Rejoin collaborative session"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                <polyline points="10 17 15 12 10 7"/>
+                <line x1="15" y1="12" x2="3" y2="12"/>
+              </svg>
+              Rejoin
+            </button>
+          )}
+
+          <button className='bg-blue-500 text-white text-sm h-10 font-semibold flex justify-center items-center gap-2 rounded-lg px-4 hover:bg-blue-400 transition-colors' onClick={() => handleShare(boardId)}>
+            Share
+            <img src={sharelink} className="h-4" />
+          </button>
+        </div>
       </div>
 
-      <Canvas canvasRef={canvasRef} tool={tool} mode={mode} handleHistory={handleHistory} boardId={boardId} onEventSaved={handleEventSaved} socket={socket}/>
+      {/* Canvas takes remaining space */}
+      <Canvas canvasRef={canvasRef} tool={tool} mode={mode} handleHistory={handleHistory} boardId={boardId} onEventSaved={handleEventSaved} socket={socket} isCollaborating={isCollaborating}/>
       
-      {/* Active Users Box */}
-      {activeUsers.length > 0 && (
-        <div className='fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-[#232329] text-white px-6 py-3 rounded-lg shadow-lg border border-gray-700'>
-          <div className='flex items-center gap-3'>
-            <span className='text-sm font-semibold'>Active Users:</span>
-            <div className='flex gap-2'>
-              {activeUsers.map((user, index) => (
-                <div key={user.socketId} className='flex items-center gap-1 bg-[#121212] px-3 py-1 rounded-full'>
-                  <div className='w-2 h-2 bg-green-500 rounded-full'></div>
-                  <span className='text-sm'>{user.name}</span>
-                </div>
-              ))}
+      {/* Active Users / Status Bar */}
+      <div className='fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50'>
+        {isCollaborating && activeUsers.length > 0 ? (
+          <div className='bg-[#232329]/95 backdrop-blur-sm text-white px-5 py-2.5 rounded-full shadow-lg border border-white/10'>
+            <div className='flex items-center gap-3'>
+              <div className='flex -space-x-2'>
+                {activeUsers.slice(0, 5).map((user) => (
+                  <div key={user.socketId} className='w-7 h-7 rounded-full bg-blue-500/40 border-2 border-[#232329] flex items-center justify-center text-xs font-medium'>
+                    {user.name?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                ))}
+                {activeUsers.length > 5 && (
+                  <div className='w-7 h-7 rounded-full bg-white/10 border-2 border-[#232329] flex items-center justify-center text-xs font-medium'>
+                    +{activeUsers.length - 5}
+                  </div>
+                )}
+              </div>
+              <div className='flex items-center gap-1.5'>
+                <div className='w-2 h-2 bg-emerald-400 rounded-full animate-pulse'></div>
+                <span className='text-xs text-white/60'>{activeUsers.length} online</span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        ) : !isCollaborating ? (
+          <div className='bg-[#232329]/95 backdrop-blur-sm text-white px-5 py-2.5 rounded-full shadow-lg border border-orange-500/20'>
+            <div className='flex items-center gap-2'>
+              <div className='w-2 h-2 bg-orange-400 rounded-full'></div>
+              <span className='text-xs text-white/60'>Offline mode — drawings are local only</span>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }

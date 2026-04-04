@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { boardEventService } from '../utils/boardEventService';
 
-const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved, socket}) => {
+const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved, socket, isCollaborating}) => {
 
     
     const [isDrawing, setIsDrawing] = useState(false);
@@ -11,28 +11,72 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved, so
     const [savedCanvasState, setSavedCanvasState] = useState(null);
     const [currentEvent, setCurrentEvent] = useState(null);
     
+    // Ref to store the latest events for replay on resize
+    const eventsRef = useRef([]);
+
+    // Expose a method to update eventsRef from parent
+    useEffect(() => {
+        // Parent passes events implicitly through re-renders;
+        // we'll update eventsRef via a callback in replayEvents
+    }, []);
+
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        function resize() {
+        // Set canvas buffer size to match its CSS display size
+        const setCanvasSize = () => {
             const dpr = window.devicePixelRatio || 1;
+
+            // Save current canvas content before resize
+            let imageData = null;
+            const oldWidth = canvas.width;
+            const oldHeight = canvas.height;
+            if (oldWidth > 0 && oldHeight > 0) {
+                try {
+                    const ctx = canvas.getContext('2d');
+                    imageData = ctx.getImageData(0, 0, oldWidth, oldHeight);
+                } catch (e) {
+                    // Canvas may be empty, ignore
+                }
+            }
+
+            // Read the canvas's CSS-computed display size
             const rect = canvas.getBoundingClientRect();
-            canvas.width = Math.floor(rect.width * dpr);
-            canvas.height = Math.floor(rect.height * dpr);
-            canvas.style.width = `${rect.width}px`;
-            canvas.style.height = `${rect.height}px`;
+            const newWidth = Math.floor(rect.width * dpr);
+            const newHeight = Math.floor(rect.height * dpr);
+
+            // Only resize if dimensions actually changed
+            if (canvas.width === newWidth && canvas.height === newHeight) return;
+
+            canvas.width = newWidth;
+            canvas.height = newHeight;
             const ctx = canvas.getContext("2d");
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        }
 
+            // Restore content after resize
+            if (imageData && oldWidth > 0 && oldHeight > 0) {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = oldWidth;
+                tempCanvas.height = oldHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.putImageData(imageData, 0, 0);
 
-        resize();
-        const obs = new ResizeObserver(resize);
-        obs.observe(canvas);
+                // Draw old content scaled to new display size
+                ctx.drawImage(tempCanvas, 0, 0, rect.width, rect.height);
+            }
+        };
+
+        setCanvasSize();
+
+        const container = canvas.parentElement;
+        const obs = new ResizeObserver(() => {
+            setCanvasSize();
+        });
+        obs.observe(container || canvas);
+
         return () => obs.disconnect();
-        }, []
-    );
+    }, []);
 
     useEffect(() => {
         if (!socket || !boardId) {
@@ -47,15 +91,8 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved, so
             drawEventOnCanvas(eventData);
         });
 
-        // Listen for initial events
-        // socket.on('initialEvents', (events) => {
-        //     console.log('Canvas: Received initialEvents', events.length);
-        //     replayEvents(events);
-        // });
-
         return () => {
             socket.off('remoteDrawing');
-            //socket.off('initialEvents');
         };
     }, [socket, boardId]);
 
@@ -143,7 +180,8 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved, so
     }
 
     const saveEventToBackend = async (eventData) => {
-        if (!socket || !boardId) return;
+        // Only emit via socket if collaborating and socket is connected
+        if (!socket || !boardId || !isCollaborating || !socket.connected) return;
 
         console.log('Canvas: Emitting drawing event', eventData);
 
@@ -303,23 +341,21 @@ const Canvas = ({canvasRef, tool, mode, handleHistory, boardId, onEventSaved, so
     }
 
   return (
-    <>
+    <div className="flex-1 min-h-0 px-4 pb-4 overflow-hidden">
         <canvas
-        width={window.innerWidth }
-        height={window.innerHeight - 100}
-        onMouseDown={startDraw}
-        onMouseMove={moveDraw}
-        onMouseUp={endDraw} 
-        onMouseLeave={endDraw}
-        onTouchStart={startDraw}
-        onTouchMove={moveDraw}
-        onTouchEnd={endDraw}
-        
-        ref={canvasRef} className='mt-10 ml-10 border-2 border-gray-600 bg-[#1E1E1E] m-10 rounded-lg cursor-crosshair'>
-      
+            onMouseDown={startDraw}
+            onMouseMove={moveDraw}
+            onMouseUp={endDraw} 
+            onMouseLeave={endDraw}
+            onTouchStart={startDraw}
+            onTouchMove={moveDraw}
+            onTouchEnd={endDraw}
+            ref={canvasRef} 
+            className='border border-gray-700 bg-[#1E1E1E] rounded-lg cursor-crosshair'
+            style={{ display: 'block', width: '100%', height: '100%', boxSizing: 'border-box' }}
+        >
         </canvas>
-
-    </>
+    </div>
     
   )
 }

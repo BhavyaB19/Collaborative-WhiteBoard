@@ -23,11 +23,26 @@ export const UserContextProvider = (props) => {
                 toast.error(data.message);
             }
         } catch (error) {
-            toast.error("Session expired. Please login again.")
+            // Clear stale token if auth fails
+            localStorage.removeItem('token');
+            setToken(null);
+            setUserData(null);
         }
     }
 
-    const value = {backendUrl, userData, setUserData, getUserData, token};
+    // Auto-fetch user data on mount if a token exists
+    useEffect(() => {
+        const initAuth = async () => {
+            const storedToken = localStorage.getItem('token');
+            if (storedToken) {
+                await getUserData();
+            }
+            setIsLoading(false);
+        };
+        initAuth();
+    }, []);
+
+    const value = {backendUrl, userData, setUserData, getUserData, token, setToken, isLoading};
 
     return (
         <UserContext.Provider value={value}>
@@ -35,4 +50,3 @@ export const UserContextProvider = (props) => {
         </UserContext.Provider>
     )
 }
-
